@@ -3,6 +3,7 @@ import plotly.graph_objects as go
 
 from data import get_market_data
 from indicators import calculate_ema, get_trend
+from structure import find_swing_points
 
 
 # Page settings
@@ -39,6 +40,9 @@ for index, (name, timeframe) in enumerate(timeframes.items()):
 
     trend = get_trend(data)
 
+    highs, lows = find_swing_points(data)
+
+
 
     with cols[index]:
 
@@ -52,7 +56,11 @@ for index, (name, timeframe) in enumerate(timeframes.items()):
 
         else:
             st.warning(trend)
-            
+
+        st.write("Swing Highs:", len(highs))
+        st.write("Swing Lows:", len(lows))
+
+        
         fig = go.Figure()
 
         fig.add_trace(
