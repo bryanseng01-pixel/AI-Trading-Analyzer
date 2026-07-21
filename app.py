@@ -60,9 +60,10 @@ for index, (name, timeframe) in enumerate(timeframes.items()):
         st.write("Swing Highs:", len(highs))
         st.write("Swing Lows:", len(lows))
 
-        
+
         fig = go.Figure()
 
+        # 1. Candlesticks
         fig.add_trace(
             go.Candlestick(
                 x=data.index,
@@ -70,11 +71,14 @@ for index, (name, timeframe) in enumerate(timeframes.items()):
                 high=data["High"],
                 low=data["Low"],
                 close=data["Close"],
-                name="Price"
+                name="Price",
+                increasing_line_width=2,
+                decreasing_line_width=2,
             )
         )
 
 
+        #EMA 50
         fig.add_trace(
             go.Scatter(
                 x=data.index,
@@ -84,11 +88,61 @@ for index, (name, timeframe) in enumerate(timeframes.items()):
             )
         )
 
+        # Swing High markers
+        if highs:
+            fig.add_trace(
+                go.Scatter(
+                    x=[x[0] for x in highs[-3:]],
+                    y=[x[1] for x in highs[-3:]],
+                    mode="markers",
+                    marker=dict(
+                        size=10,
+                        symbol="triangle-down"
+                    ),
+                    name="Swing High"
+                )
+            )
+
+
+        # Swing Low markers
+        if lows:
+            fig.add_trace(
+                go.Scatter(
+                    x=[x[0] for x in lows[-3:]],
+                    y=[x[1] for x in lows[-3:]],
+                    mode="markers",
+                    marker=dict(
+                        size=10,
+                        symbol="triangle-up"
+                    ),
+                    name="Swing Low"
+                )
+            )
+        
+
 
         fig.update_layout(
-            height=400,
+            height=650,
+            template="plotly_dark",
             xaxis_rangeslider_visible=False,
-            title=f"{name} Chart"
+            hovermode="x unified",
+            margin=dict(
+                l=20,
+                r=20,
+                t=50,
+                b=20
+            ),
+            xaxis=dict(
+                showgrid=False,
+                showspikes=True,
+                spikemode="across",
+                spikesnap="cursor"
+            ),
+            yaxis=dict(
+                showgrid=True,
+                showspikes=True,
+                spikemode="across"
+            )
         )
 
 
