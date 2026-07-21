@@ -28,125 +28,146 @@ timeframes = {
     "15 Minute": "15m"
 }
 
-
-cols = st.columns(3)
+bias_cols = st.columns(3)
 
 
 for index, (name, timeframe) in enumerate(timeframes.items()):
 
-    data = get_market_data(symbol, timeframe)
+    bias_data = get_market_data(symbol, timeframe)
 
-    data = calculate_ema(data)
+    bias_data = calculate_ema(bias_data)
 
-    trend = get_trend(data)
-
-    highs, lows = find_swing_points(data)
+    bias = get_trend(bias_data)
 
 
-
-    with cols[index]:
+    with bias_cols[index]:
 
         st.subheader(name)
 
-        if "BULLISH" in trend:
-            st.success(trend)
+        if "BULLISH" in bias:
+            st.success(bias)
 
-        elif "BEARISH" in trend:
-            st.error(trend)
+        elif "BEARISH" in bias:
+            st.error(bias)
 
         else:
-            st.warning(trend)
+            st.warning(bias)
 
-        st.write("Swing Highs:", len(highs))
-        st.write("Swing Lows:", len(lows))
-
-
-        fig = go.Figure()
-
-        # 1. Candlesticks
-        fig.add_trace(
-            go.Candlestick(
-                x=data.index,
-                open=data["Open"],
-                high=data["High"],
-                low=data["Low"],
-                close=data["Close"],
-                name="Price",
-                increasing_line_width=2,
-                decreasing_line_width=2,
-            )
-        )
+# CHART SELECTOR
+selected = st.selectbox(
+    "Chart Timeframe",
+    ["4 Hour", "1 Hour", "15 Minute"]
+)
 
 
-        #EMA 50
-        fig.add_trace(
-            go.Scatter(
-                x=data.index,
-                y=data["EMA50"],
-                mode="lines",
-                name="EMA 50"
-            )
-        )
+ # Convert selected name into Yahoo timeframe
 
-        # Swing High markers
-        if highs:
-            fig.add_trace(
-                go.Scatter(
-                    x=[x[0] for x in highs[-3:]],
-                    y=[x[1] for x in highs[-3:]],
-                    mode="markers",
-                    marker=dict(
-                        size=10,
-                        symbol="triangle-down"
-                    ),
-                    name="Swing High"
-                )
-            )
+selected_timeframe = timeframes[selected]
 
 
-        # Swing Low markers
-        if lows:
-            fig.add_trace(
-                go.Scatter(
-                    x=[x[0] for x in lows[-3:]],
-                    y=[x[1] for x in lows[-3:]],
-                    mode="markers",
-                    marker=dict(
-                        size=10,
-                        symbol="triangle-up"
-                    ),
-                    name="Swing Low"
-                )
-            )
-        
+# Load selected chart data
+
+data = get_market_data(symbol, selected_timeframe)
+
+data = calculate_ema(data)
+
+trend = get_trend(data)
+
+highs, lows = find_swing_points(data)
 
 
-        fig.update_layout(
-            height=650,
-            template="plotly_dark",
-            xaxis_rangeslider_visible=False,
-            hovermode="x unified",
-            margin=dict(
-                l=20,
-                r=20,
-                t=50,
-                b=20
+
+# Display bias
+
+st.subheader("Current Market Bias")
+
+if "BULLISH" in trend:
+    st.success(trend)
+
+elif "BEARISH" in trend:
+    st.error(trend)
+
+else:
+    st.warning(trend)
+
+
+st.write("Swing Highs:", len(highs))
+st.write("Swing Lows:", len(lows))
+
+
+
+# Create chart
+
+fig = go.Figure()
+
+
+# Candles
+fig.add_trace(
+    go.Candlestick(
+        x=data.index,
+        open=data["Open"],
+        high=data["High"],
+        low=data["Low"],
+        close=data["Close"],
+        name="Price",
+        increasing_line_width=2,
+        decreasing_line_width=2,
+    )
+)
+
+
+# EMA 50
+fig.add_trace(
+    go.Scatter(
+        x=data.index,
+        y=data["EMA50"],
+        mode="lines",
+        name="EMA 50"
+    )
+)
+
+
+# Swing Highs
+if highs:
+    fig.add_trace(
+        go.Scatter(
+            x=[x[0] for x in highs[-3:]],
+            y=[x[1] for x in highs[-3:]],
+            mode="markers",
+            marker=dict(
+                size=10,
+                symbol="triangle-down"
             ),
-            xaxis=dict(
-                showgrid=False,
-                showspikes=True,
-                spikemode="across",
-                spikesnap="cursor"
+            name="Swing High"
+        )
+    )
+
+
+# Swing Lows
+if lows:
+    fig.add_trace(
+        go.Scatter(
+            x=[x[0] for x in lows[-3:]],
+            y=[x[1] for x in lows[-3:]],
+            mode="markers",
+            marker=dict(
+                size=10,
+                symbol="triangle-up"
             ),
-            yaxis=dict(
-                showgrid=True,
-                showspikes=True,
-                spikemode="across"
-            )
+            name="Swing Low"
         )
+    )
 
 
-        st.plotly_chart(
-            fig,
-            use_container_width=True
-        )
+fig.update_layout(
+    height=750,
+    template="plotly_dark",
+    xaxis_rangeslider_visible=False,
+    hovermode="x unified"
+)
+
+
+st.plotly_chart(
+    fig,
+    use_container_width=True
+)
