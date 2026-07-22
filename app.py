@@ -9,8 +9,8 @@ from market_structure import (
     label_lows,
     determine_structure,
     interpret_bias_and_structure,
+    detect_bos,
 )
-
 
 # Page settings
 st.set_page_config(
@@ -92,7 +92,12 @@ market_summary = interpret_bias_and_structure(
     trend,
     structure,
 )
-
+bos_status = detect_bos(
+    data,
+    high_labels,
+    low_labels,
+    structure,
+)
 
 # Display bias
 
@@ -121,7 +126,16 @@ if low_labels:
     st.write("Latest Swing Low:", latest_low_label)
 st.subheader("Market Interpretation")
 st.success(market_summary)
+st.subheader("Break of Structure")
 
+if "Bullish BOS" in bos_status:
+    st.success(bos_status)
+
+elif "Bearish BOS" in bos_status:
+    st.error(bos_status)
+
+else:
+    st.info(bos_status)
 # Create chart
 
 fig = go.Figure()
