@@ -4,6 +4,12 @@ import plotly.graph_objects as go
 from data import get_market_data
 from indicators import calculate_ema, get_trend
 from structure import find_swing_points
+from market_structure import (
+    label_highs,
+    label_lows,
+    determine_structure,
+    interpret_bias_and_structure,
+)
 
 
 # Page settings
@@ -75,6 +81,17 @@ trend = get_trend(data)
 
 highs, lows = find_swing_points(data)
 
+high_labels = label_highs(highs)
+low_labels = label_lows(lows)
+
+structure = determine_structure(
+    high_labels,
+    low_labels,
+)
+market_summary = interpret_bias_and_structure(
+    trend,
+    structure,
+)
 
 
 # Display bias
@@ -93,8 +110,17 @@ else:
 
 st.write("Swing Highs:", len(highs))
 st.write("Swing Lows:", len(lows))
+st.subheader("Market Structure")
+st.info(structure)
+if high_labels:
+    latest_high_label = high_labels[-1][2]
+    st.write("Latest Swing High:", latest_high_label)
 
-
+if low_labels:
+    latest_low_label = low_labels[-1][2]
+    st.write("Latest Swing Low:", latest_low_label)
+st.subheader("Market Interpretation")
+st.success(market_summary)
 
 # Create chart
 
@@ -110,8 +136,10 @@ fig.add_trace(
         low=data["Low"],
         close=data["Close"],
         name="Price",
-        increasing_line_width=2,
-        decreasing_line_width=2,
+        increasing_line_color="green",
+        increasing_fillcolor="green",
+        decreasing_line_color="red",
+        decreasing_fillcolor="red"
     )
 )
 
