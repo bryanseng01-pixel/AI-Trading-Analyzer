@@ -134,3 +134,44 @@ def detect_bos(data, high_labels, low_labels, structure):
             return f"Bearish BOS detected at {break_time}"
 
     return "No BOS detected"
+
+def detect_choch(data, high_labels, low_labels, structure):
+    """
+    Detects a Change of Character (CHoCH).
+
+    A CHoCH is an opposing break against
+    the current market structure.
+    """
+
+    if data.empty:
+        return "No CHoCH detected"
+
+    # Bullish structure -> bearish break
+    if structure == "Bullish Structure" and low_labels:
+        last_low_time = low_labels[-1][0]
+        last_low_price = low_labels[-1][1]
+
+        candles_after = data[data.index > last_low_time]
+
+        broken = candles_after[
+            candles_after["Close"] < last_low_price
+        ]
+
+        if not broken.empty:
+            return f"Bearish CHoCH detected at {broken.index[0]}"
+
+    # Bearish structure -> bullish break
+    if structure == "Bearish Structure" and high_labels:
+        last_high_time = high_labels[-1][0]
+        last_high_price = high_labels[-1][1]
+
+        candles_after = data[data.index > last_high_time]
+
+        broken = candles_after[
+            candles_after["Close"] > last_high_price
+        ]
+
+        if not broken.empty:
+            return f"Bullish CHoCH detected at {broken.index[0]}"
+
+    return "No CHoCH detected"

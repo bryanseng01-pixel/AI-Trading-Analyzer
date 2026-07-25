@@ -10,6 +10,11 @@ from market_structure import (
     determine_structure,
     interpret_bias_and_structure,
     detect_bos,
+    detect_choch,
+)
+from liquidity import (
+    find_equal_highs,
+    find_equal_lows,
 )
 
 # Page settings
@@ -81,6 +86,9 @@ trend = get_trend(data)
 
 highs, lows = find_swing_points(data)
 
+equal_highs = find_equal_highs(highs, tolerance=5.0)
+equal_lows = find_equal_lows(lows, tolerance=5.0)
+
 high_labels = label_highs(highs)
 low_labels = label_lows(lows)
 
@@ -98,44 +106,72 @@ bos_status = detect_bos(
     low_labels,
     structure,
 )
+choch_status = detect_choch(
+    data,
+    high_labels,
+    low_labels,
+    structure,
+)
 
-# Display bias
+# ===== AI Dashboard =====
 
-st.subheader("Current Market Bias")
+col1, col2, col3, col4 = st.columns(4)
 
-if "BULLISH" in trend:
-    st.success(trend)
+with col1:
+    st.subheader("Trend")
 
-elif "BEARISH" in trend:
-    st.error(trend)
+    if "BULLISH" in trend:
+        st.success(trend)
+    elif "BEARISH" in trend:
+        st.error(trend)
+    else:
+        st.warning(trend)
 
-else:
-    st.warning(trend)
+
+with col2:
+    st.subheader("Structure")
+    st.info(structure)
 
 
-st.write("Swing Highs:", len(highs))
-st.write("Swing Lows:", len(lows))
-st.subheader("Market Structure")
-st.info(structure)
+with col3:
+    st.subheader("BOS")
+
+    if "Bullish BOS" in bos_status:
+        st.success(bos_status)
+    elif "Bearish BOS" in bos_status:
+        st.error(bos_status)
+    else:
+        st.info(bos_status)
+
+
+with col4:
+    st.subheader("CHoCH")
+
+    if "Bullish CHoCH" in choch_status:
+        st.success(choch_status)
+    elif "Bearish CHoCH" in choch_status:
+        st.error(choch_status)
+    else:
+        st.info(choch_status)
+
+
+st.subheader("🧠 AI Market Summary")
+st.info(market_summary)
+
+st.subheader("Liquidity")
+
+st.write(f"Equal Highs Found: {len(equal_highs)}")
+st.write(f"Equal Lows Found: {len(equal_lows)}")
+
+st.write(f"Swing Highs: {len(highs)}")
+st.write(f"Swing Lows: {len(lows)}")
+
 if high_labels:
-    latest_high_label = high_labels[-1][2]
-    st.write("Latest Swing High:", latest_high_label)
+    st.write(f"Latest Swing High: {high_labels[-1][2]}")
 
 if low_labels:
-    latest_low_label = low_labels[-1][2]
-    st.write("Latest Swing Low:", latest_low_label)
-st.subheader("Market Interpretation")
-st.success(market_summary)
-st.subheader("Break of Structure")
+    st.write(f"Latest Swing Low: {low_labels[-1][2]}")
 
-if "Bullish BOS" in bos_status:
-    st.success(bos_status)
-
-elif "Bearish BOS" in bos_status:
-    st.error(bos_status)
-
-else:
-    st.info(bos_status)
 # Create chart
 
 fig = go.Figure()
