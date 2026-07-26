@@ -153,12 +153,18 @@ with col3:
 with col4:
     st.subheader("CHoCH")
 
-    if "Bullish CHoCH" in choch_status:
-        st.success(choch_status)
-    elif "Bearish CHoCH" in choch_status:
-        st.error(choch_status)
-    else:
-        st.info(choch_status)
+    if choch_status is None:
+        st.info("No CHoCH detected")
+
+    elif choch_status["direction"] == "bullish":
+        st.success(
+            f'Bullish CHoCH at {choch_status["time"]}'
+        )
+
+    elif choch_status["direction"] == "bearish":
+        st.error(
+            f'Bearish CHoCH at {choch_status["time"]}'
+        )
 
 
 st.subheader("🧠 AI Market Summary")
@@ -185,6 +191,7 @@ display_tradingview_chart(
     high_labels=high_labels,
     low_labels=low_labels,
     bos=bos_status,
+    choch=choch_status,
     height=700,
 )
 

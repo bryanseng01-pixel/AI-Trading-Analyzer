@@ -9,8 +9,10 @@ def display_tradingview_chart(
     high_labels=None,
     low_labels=None,
     bos=None,
+    choch=None,
     height: int = 700,
 ) -> None:
+
 
     """
     Displays candlestick data using TradingView Lightweight Charts.
@@ -22,6 +24,7 @@ def display_tradingview_chart(
     high_labels = high_labels or []
     low_labels = low_labels or []
     bos = bos or None
+    choch = choch or None
 
     if data is None or data.empty:
         return
@@ -37,6 +40,7 @@ def display_tradingview_chart(
     ema_data = []
     markers = []
     bos_line = None
+    choch_line = None
 
     for timestamp, row in data.iterrows():
         timestamp = pd.Timestamp(timestamp)
@@ -98,11 +102,18 @@ def display_tradingview_chart(
             "price": float(bos["level"]),
             "direction": bos["direction"],
         }
+    if choch is not None:
+        choch_line = {
+            "time": int(pd.Timestamp(choch["time"]).timestamp()),
+            "price": float(choch["level"]),
+            "direction": choch["direction"],
+        }
 
     candles_json = json.dumps(chart_data)
     ema_json = json.dumps(ema_data)
     markers_json = json.dumps(markers)
     bos_json = json.dumps(bos_line)
+    choch_json = json.dumps(choch_line)
     
     html_code = f"""
     <!DOCTYPE html>
@@ -224,6 +235,24 @@ def display_tradingview_chart(
                     lineStyle: LightweightCharts.LineStyle.Dashed,
                     axisLabelVisible: true,
                     title: "BOS"
+                }});
+            }}
+            
+            const chochData = {choch_json};
+
+            if (chochData !== null) {{
+                const chochColor =
+                    chochData.direction === "bullish"
+                        ? "#42a5f5"
+                        : "#ff9800";
+
+                candleSeries.createPriceLine({{
+                    price: chochData.price,
+                    color: chochColor,
+                    lineWidth: 2,
+                    lineStyle: LightweightCharts.LineStyle.Dotted,
+                    axisLabelVisible: true,
+                    title: "CHoCH"
                 }});
             }}
 
