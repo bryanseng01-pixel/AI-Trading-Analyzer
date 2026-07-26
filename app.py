@@ -1,5 +1,6 @@
 import streamlit as st
 
+from fair_value_gap import detect_fair_value_gaps
 from data import get_market_data
 from indicators import calculate_ema, get_trend
 from structure import find_swing_points
@@ -23,7 +24,32 @@ st.set_page_config(
     page_icon="📈",
     layout="wide"
 )
+st.sidebar.title("⚙️ Chart Settings")
 
+labels_to_show = st.sidebar.slider(
+    "Swing Labels",
+    min_value=2,
+    max_value=20,
+    value=6,
+    step=1,
+)
+
+st.sidebar.subheader("FVG Settings")
+
+minimum_fvg_size = st.sidebar.number_input(
+    "Minimum FVG Size (points)",
+    min_value=0.25,
+    max_value=100.0,
+    value=5.0,
+    step=0.25,
+)
+
+maximum_fvgs = st.sidebar.slider(
+    "Maximum Active FVGs",
+    min_value=1,
+    max_value=10,
+    value=3,
+)
 
 st.title("📈 AI Trading Analyzer")
 
@@ -113,6 +139,24 @@ choch_status = detect_choch(
     structure,
 )
 
+fvgs = detect_fair_value_gaps(data)
+current_price = float(data["Close"].iloc[-1])
+
+active_fvgs = [
+    fvg
+    for fvg in fvgs
+    if not fvg["mitigated"]
+    and (fvg["top"] - fvg["bottom"]) >= minimum_fvg_size
+]
+
+active_fvgs.sort(
+    key=lambda fvg: abs(
+        ((fvg["top"] + fvg["bottom"]) / 2) - current_price
+    )
+)
+
+active_fvgs = active_fvgs[:maximum_fvgs]
+
 # ===== AI Dashboard =====
 
 col1, col2, col3, col4 = st.columns(4)
@@ -186,12 +230,37 @@ if low_labels:
 
 st.subheader("TradingView-Style Chart")
 
+
+st.subheader("Fair Value Gaps")
+
+bullish_fvgs = [
+    fvg for fvg in fvgs
+    if fvg["type"] == "bullish"
+    and not fvg["mitigated"]
+]
+
+bearish_fvgs = [
+    fvg for fvg in fvgs
+    if fvg["type"] == "bearish"
+    and not fvg["mitigated"]
+]
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.metric("Bullish", len(bullish_fvgs))
+
+with col2:
+    st.metric("Bearish", len(bearish_fvgs))
+
 display_tradingview_chart(
     data,
-    high_labels=high_labels,
-    low_labels=low_labels,
+    high_labels=high_labels[-labels_to_show:],
+    low_labels=low_labels[-labels_to_show:],
     bos=bos_status,
     choch=choch_status,
+    equal_highs=equal_highs[-3:],
+    equal_lows=equal_lows[-3:],
+    fvgs=active_fvgs,
     height=700,
 )
-

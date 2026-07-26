@@ -10,6 +10,9 @@ def display_tradingview_chart(
     low_labels=None,
     bos=None,
     choch=None,
+    equal_highs=None,
+    equal_lows=None,
+    fvgs=None,
     height: int = 700,
 ) -> None:
 
@@ -25,6 +28,9 @@ def display_tradingview_chart(
     low_labels = low_labels or []
     bos = bos or None
     choch = choch or None
+    equal_highs = equal_highs or []
+    equal_lows = equal_lows or []
+    fvgs = fvgs or []
 
     if data is None or data.empty:
         return
@@ -41,6 +47,7 @@ def display_tradingview_chart(
     markers = []
     bos_line = None
     choch_line = None
+    liquidity_lines = []
 
     for timestamp, row in data.iterrows():
         timestamp = pd.Timestamp(timestamp)
@@ -109,11 +116,57 @@ def display_tradingview_chart(
             "direction": choch["direction"],
         }
 
+    liquidity_lines = []
+
+    for pool in equal_highs:
+        liquidity_lines.append(
+            {
+                "type": "buy_side",
+                "start_time": int(pd.Timestamp(pool["start_time"]).timestamp()),
+                "end_time": int(pd.Timestamp(pool["end_time"]).timestamp()),
+                "price": float(pool["level"]),
+            }
+        )
+
+    for pool in equal_lows:
+        liquidity_lines.append(
+            {
+                "type": "sell_side",
+                "start_time": int(pd.Timestamp(pool["start_time"]).timestamp()),
+                "end_time": int(pd.Timestamp(pool["end_time"]).timestamp()),
+                "price": float(pool["level"]),
+            }
+        )
+
     candles_json = json.dumps(chart_data)
     ema_json = json.dumps(ema_data)
     markers_json = json.dumps(markers)
     bos_json = json.dumps(bos_line)
     choch_json = json.dumps(choch_line)
+    liquidity_json = json.dumps(liquidity_lines)
+
+    active_fvgs = []
+
+    for fvg in fvgs:
+        if fvg["mitigated"]:
+            continue
+
+        active_fvgs.append(
+            {
+                "type": fvg["type"],
+                "start_time": int(
+                    pd.Timestamp(fvg["start_time"]).timestamp()
+                ),
+                "end_time": int(
+                    pd.Timestamp(fvg["end_time"]).timestamp()
+                ),
+                "top": float(fvg["top"]),
+                "bottom": float(fvg["bottom"]),
+                "mitigated": False,
+            }
+        )
+
+    fvg_json = json.dumps(active_fvgs)
     
     html_code = f"""
     <!DOCTYPE html>
@@ -237,7 +290,7 @@ def display_tradingview_chart(
                     title: "BOS"
                 }});
             }}
-            
+
             const chochData = {choch_json};
 
             if (chochData !== null) {{
@@ -256,7 +309,74 @@ def display_tradingview_chart(
                 }});
             }}
 
-            chart.timeScale().fitContent();
+            const liquidityData = {liquidity_json};
+            const fvgData = {fvg_json};
+
+            liquidityData.forEach((level) => {{
+
+                const color =
+                    level.type === "buy_side"
+                        ? "#00bcd4"
+                        : "#ffb300";
+
+                candleSeries.createPriceLine({{
+                    price: level.price,
+                    color: color,
+                    lineWidth: 1,
+                    lineStyle: LightweightCharts.LineStyle.Dotted,
+                    axisLabelVisible: true,
+                    title:
+                        level.type === "buy_side"
+                            ? "BSL"
+                            : "SSL",
+                }});
+
+            }});
+
+           
+            fvgData.forEach((fvg) => {{
+
+                const fvgColor =
+                    fvg.type === "bullish"
+                        ? "rgba(38, 166, 154, 0.25)"
+                        : "rgba(239, 83, 80, 0.25)";
+
+                const borderColor =
+                    fvg.type === "bullish"
+                        ? "#26a69a"
+                        : "#ef5350";
+
+                const fvgSeries = chart.addSeries(
+                    LightweightCharts.BaselineSeries,
+                    {{
+                        baseValue: {{
+                            type: "price",
+                            price: fvg.bottom
+                        }},
+                        topFillColor1: fvgColor,
+                        topFillColor2: fvgColor,
+                        bottomFillColor1: fvgColor,
+                        bottomFillColor2: fvgColor,
+                        topLineColor: borderColor,
+                        bottomLineColor: borderColor,
+                        lineWidth: 1,
+                        priceLineVisible: false,
+                        lastValueVisible: false
+                    }}
+                );
+
+                fvgSeries.setData([
+                    {{
+                        time: fvg.start_time,
+                        value: fvg.top
+                    }},
+                    {{
+                        time: candleData[candleData.length - 1].time,
+                        value: fvg.top
+                    }}
+                ]);
+
+            }});
 
             chart.timeScale().fitContent();
 
