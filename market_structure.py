@@ -93,47 +93,60 @@ def detect_bos(data, high_labels, low_labels, structure):
     """
     Detects continuation Break of Structure.
 
-    Bullish structure:
-        Close above the previous swing high = Bullish BOS
-
-    Bearish structure:
-        Close below the previous swing low = Bearish BOS
+    Returns a dictionary if BOS exists,
+    otherwise returns None.
     """
 
     if data.empty:
-        return "No BOS detected"
+        return None
 
-    # Bullish continuation BOS
+    # Bullish BOS
     if structure == "Bullish Structure" and len(high_labels) >= 2:
+
         previous_high_time = high_labels[-2][0]
         previous_high_price = high_labels[-2][1]
 
         candles_after_high = data[data.index > previous_high_time]
 
-        broken_candles = candles_after_high[
+        broken = candles_after_high[
             candles_after_high["Close"] > previous_high_price
         ]
 
-        if not broken_candles.empty:
-            break_time = broken_candles.index[0]
-            return f"Bullish BOS detected at {break_time}"
+        if not broken.empty:
 
-    # Bearish continuation BOS
+            break_time = broken.index[0]
+
+            return {
+                "direction": "bullish",
+                "time": break_time,
+                "level": previous_high_price,
+                "text": "BOS",
+            }
+
+    # Bearish BOS
     if structure == "Bearish Structure" and len(low_labels) >= 2:
+
         previous_low_time = low_labels[-2][0]
         previous_low_price = low_labels[-2][1]
 
         candles_after_low = data[data.index > previous_low_time]
 
-        broken_candles = candles_after_low[
+        broken = candles_after_low[
             candles_after_low["Close"] < previous_low_price
         ]
 
-        if not broken_candles.empty:
-            break_time = broken_candles.index[0]
-            return f"Bearish BOS detected at {break_time}"
+        if not broken.empty:
 
-    return "No BOS detected"
+            break_time = broken.index[0]
+
+            return {
+                "direction": "bearish",
+                "time": break_time,
+                "level": previous_low_price,
+                "text": "BOS",
+            }
+
+    return None
 
 def detect_choch(data, high_labels, low_labels, structure):
     """

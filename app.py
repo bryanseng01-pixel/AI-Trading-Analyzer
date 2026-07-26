@@ -136,12 +136,18 @@ with col2:
 with col3:
     st.subheader("BOS")
 
-    if "Bullish BOS" in bos_status:
-        st.success(bos_status)
-    elif "Bearish BOS" in bos_status:
-        st.error(bos_status)
-    else:
-        st.info(bos_status)
+    if bos_status is None:
+        st.info("No BOS detected")
+
+    elif bos_status["direction"] == "bullish":
+        st.success(
+            f'Bullish BOS at {bos_status["time"]}'
+        )
+
+    elif bos_status["direction"] == "bearish":
+        st.error(
+            f'Bearish BOS at {bos_status["time"]}'
+        )
 
 
 with col4:
@@ -178,6 +184,7 @@ display_tradingview_chart(
     data,
     high_labels=high_labels,
     low_labels=low_labels,
+    bos=bos_status,
     height=700,
 )
 

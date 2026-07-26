@@ -8,6 +8,7 @@ def display_tradingview_chart(
     data: pd.DataFrame,
     high_labels=None,
     low_labels=None,
+    bos=None,
     height: int = 700,
 ) -> None:
 
@@ -20,6 +21,7 @@ def display_tradingview_chart(
     """
     high_labels = high_labels or []
     low_labels = low_labels or []
+    bos = bos or None
 
     if data is None or data.empty:
         return
@@ -34,6 +36,7 @@ def display_tradingview_chart(
     chart_data = []
     ema_data = []
     markers = []
+    bos_line = None
 
     for timestamp, row in data.iterrows():
         timestamp = pd.Timestamp(timestamp)
@@ -88,9 +91,18 @@ def display_tradingview_chart(
 
     markers.sort(key=lambda marker: marker["time"])
 
+    if bos is not None:
+
+        bos_line = {
+            "time": int(pd.Timestamp(bos["time"]).timestamp()),
+            "price": float(bos["level"]),
+            "direction": bos["direction"],
+        }
+
     candles_json = json.dumps(chart_data)
     ema_json = json.dumps(ema_data)
     markers_json = json.dumps(markers)
+    bos_json = json.dumps(bos_line)
     
     html_code = f"""
     <!DOCTYPE html>
@@ -196,6 +208,26 @@ def display_tradingview_chart(
                 candleSeries,
                 structureMarkers
             );
+
+            const bosData = {bos_json};
+
+            if (bosData !== null) {{
+                const bosColor =
+                    bosData.direction === "bullish"
+                        ? "#26a69a"
+                        : "#ef5350";
+
+                candleSeries.createPriceLine({{
+                    price: bosData.price,
+                    color: bosColor,
+                    lineWidth: 2,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: "BOS"
+                }});
+            }}
+
+            chart.timeScale().fitContent();
 
             chart.timeScale().fitContent();
 
