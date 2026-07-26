@@ -1,5 +1,4 @@
 import streamlit as st
-import plotly.graph_objects as go
 
 from data import get_market_data
 from indicators import calculate_ema, get_trend
@@ -16,6 +15,7 @@ from liquidity import (
     find_equal_highs,
     find_equal_lows,
 )
+from tradingview_chart import display_tradingview_chart
 
 # Page settings
 st.set_page_config(
@@ -172,80 +172,12 @@ if high_labels:
 if low_labels:
     st.write(f"Latest Swing Low: {low_labels[-1][2]}")
 
-# Create chart
+st.subheader("TradingView-Style Chart")
 
-fig = go.Figure()
-
-
-# Candles
-fig.add_trace(
-    go.Candlestick(
-        x=data.index,
-        open=data["Open"],
-        high=data["High"],
-        low=data["Low"],
-        close=data["Close"],
-        name="Price",
-        increasing_line_color="green",
-        increasing_fillcolor="green",
-        decreasing_line_color="red",
-        decreasing_fillcolor="red"
-    )
+display_tradingview_chart(
+    data,
+    high_labels=high_labels,
+    low_labels=low_labels,
+    height=700,
 )
 
-
-# EMA 50
-fig.add_trace(
-    go.Scatter(
-        x=data.index,
-        y=data["EMA50"],
-        mode="lines",
-        name="EMA 50"
-    )
-)
-
-
-# Swing Highs
-if highs:
-    fig.add_trace(
-        go.Scatter(
-            x=[x[0] for x in highs[-3:]],
-            y=[x[1] for x in highs[-3:]],
-            mode="markers",
-            marker=dict(
-                size=10,
-                symbol="triangle-down"
-            ),
-            name="Swing High"
-        )
-    )
-
-
-# Swing Lows
-if lows:
-    fig.add_trace(
-        go.Scatter(
-            x=[x[0] for x in lows[-3:]],
-            y=[x[1] for x in lows[-3:]],
-            mode="markers",
-            marker=dict(
-                size=10,
-                symbol="triangle-up"
-            ),
-            name="Swing Low"
-        )
-    )
-
-
-fig.update_layout(
-    height=750,
-    template="plotly_dark",
-    xaxis_rangeslider_visible=False,
-    hovermode="x unified"
-)
-
-
-st.plotly_chart(
-    fig,
-    use_container_width=True
-)
