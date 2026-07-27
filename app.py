@@ -1,5 +1,6 @@
 import streamlit as st
 
+from ai_market_coach import generate_market_summary
 from fair_value_gap import detect_fair_value_gaps
 from data import get_market_data
 from indicators import calculate_ema, get_trend
@@ -157,6 +158,29 @@ active_fvgs.sort(
 
 active_fvgs = active_fvgs[:maximum_fvgs]
 
+bullish_active_fvgs = [
+    fvg for fvg in active_fvgs
+    if fvg["type"] == "bullish"
+]
+
+bearish_active_fvgs = [
+    fvg for fvg in active_fvgs
+    if fvg["type"] == "bearish"
+]
+
+ai_reasoning, ai_confidence, ai_score, ai_game_plan = (
+    generate_market_summary(
+        trend,
+        structure,
+        bos_status,
+        choch_status,
+        bullish_active_fvgs,
+        bearish_active_fvgs,
+        equal_highs,
+        equal_lows,
+    )
+)
+
 # ===== AI Dashboard =====
 
 col1, col2, col3, col4 = st.columns(4)
@@ -253,6 +277,23 @@ with col1:
 with col2:
     st.metric("Bearish", len(bearish_fvgs))
 
+st.subheader("🧠 AI Market Coach")
+
+coach_col1, coach_col2 = st.columns(2)
+
+with coach_col1:
+    st.metric("Confidence", ai_confidence)
+    st.metric("Market Score", f"{ai_score}/100")
+
+with coach_col2:
+    st.write("**Game Plan**")
+    st.info(ai_game_plan)
+
+st.write("**Reasoning**")
+
+for reason in ai_reasoning:
+    st.write(f"• {reason}")
+    
 display_tradingview_chart(
     data,
     high_labels=high_labels[-labels_to_show:],
