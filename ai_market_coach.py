@@ -9,79 +9,259 @@ def generate_market_summary(
     equal_lows,
 ):
     """
-    Generates an AI market summary.
+    Generates a directional market summary.
+
+    The score measures how strongly the available evidence agrees,
+    not whether the market is bullish or bearish.
     """
 
     reasoning = []
-    score = 50
+
+    bullish_points = 0
+    bearish_points = 0
+    evidence_count = 0
 
     # Trend
-    if trend == "BULLISH 🟢":
-        reasoning.append("Higher timeframe trend is bullish.")
-        score += 10
-    else:
-        reasoning.append("Higher timeframe trend is bearish.")
-        score -= 10
+    if "BULLISH" in trend:
+        bullish_points += 30
+        evidence_count += 1
+        reasoning.append("The EMA trend is bullish.")
 
-    # Structure
-    reasoning.append(f"Current market structure is {structure}.")
+    elif "BEARISH" in trend:
+        bearish_points += 30
+        evidence_count += 1
+        reasoning.append("The EMA trend is bearish.")
+
+    # Market structure
+    if structure == "Bullish Structure":
+        bullish_points += 25
+        evidence_count += 1
+        reasoning.append("Price is forming higher highs and higher lows.")
+
+    elif structure == "Bearish Structure":
+        bearish_points += 25
+        evidence_count += 1
+        reasoning.append("Price is forming lower highs and lower lows.")
+
+    else:
+        reasoning.append(
+            "Market structure is mixed or transitioning."
+        )
 
     # BOS
     if bos_status is not None:
+        evidence_count += 1
+
         if bos_status["direction"] == "bullish":
-            reasoning.append("Bullish Break of Structure confirmed.")
-            score += 10
+            bullish_points += 20
+            reasoning.append(
+                "A bullish Break of Structure confirms upward continuation."
+            )
 
         elif bos_status["direction"] == "bearish":
-            reasoning.append("Bearish Break of Structure confirmed.")
-            score -= 10
+            bearish_points += 20
+            reasoning.append(
+                "A bearish Break of Structure confirms downward continuation."
+            )
+    else:
+        reasoning.append("No continuation BOS is currently confirmed.")
 
     # CHoCH
     if choch_status is not None:
+        evidence_count += 1
+
         if choch_status["direction"] == "bullish":
-            reasoning.append("Bullish Change of Character detected.")
-            score += 5
+            bullish_points += 15
+            reasoning.append(
+                "A bullish Change of Character suggests a possible reversal upward."
+            )
 
         elif choch_status["direction"] == "bearish":
-            reasoning.append("Bearish Change of Character detected.")
-            score -= 5
+            bearish_points += 15
+            reasoning.append(
+                "A bearish Change of Character suggests a possible reversal downward."
+            )
+    else:
+        reasoning.append("No opposing CHoCH is currently confirmed.")
 
-    # Liquidity
-    if equal_highs:
-        reasoning.append("Buy-side liquidity remains available.")
-
-    if equal_lows:
-        reasoning.append("Sell-side liquidity remains available.")
-
-    # FVG
+    # Active FVGs
     if bullish_fvgs:
+        bullish_points += min(len(bullish_fvgs) * 5, 10)
+        evidence_count += 1
         reasoning.append(
-            f"{len(bullish_fvgs)} active bullish FVG(s)."
+            f"{len(bullish_fvgs)} nearby active bullish FVG(s) remain."
         )
 
     if bearish_fvgs:
+        bearish_points += min(len(bearish_fvgs) * 5, 10)
+        evidence_count += 1
         reasoning.append(
-            f"{len(bearish_fvgs)} active bearish FVG(s)."
+            f"{len(bearish_fvgs)} nearby active bearish FVG(s) remain."
         )
 
-    score = max(0, min(100, score))
+    # Liquidity is context, not automatically directional
+    if equal_highs:
+        reasoning.append(
+            "Buy-side liquidity is available above price."
+        )
 
-    if score >= 70:
+    if equal_lows:
+        reasoning.append(
+            "Sell-side liquidity is available below price."
+        )
+
+    # Determine directional alignment
+    point_difference = abs(bullish_points - bearish_points)
+    strongest_side = max(bullish_points, bearish_points)
+
+    if bullish_points >= bearish_points + 20:
+        market_bias = "Bullish"
+
+    elif bearish_points >= bullish_points + 20:
+        market_bias = "Bearish"
+
+    else:
+        market_bias = "Neutral / Conflicting"
+
+    # Confidence score measures alignment
+    if market_bias == "Neutral / Conflicting":
+        score = max(20, min(55, 55 - point_difference))
+    else:
+        score = min(
+            100,
+            strongest_side + point_difference // 2,
+        )
+
+    # Reduce confidence when little evidence exists
+    if evidence_count <= 2:
+        score = min(score, 55)
+
+    score = int(max(0, min(100, score)))
+
+    if score >= 80:
         confidence = "High"
 
-    elif score >= 40:
+    elif score >= 60:
         confidence = "Moderate"
 
     else:
         confidence = "Low"
 
-    if trend == "BULLISH 🟢":
+    # Game plan
+    if market_bias == "Bullish":
         game_plan = (
-            "Wait for bullish confirmation before entering long."
-        )
-    else:
-        game_plan = (
-            "Wait for bearish confirmation before entering short."
+            "Bullish conditions are better aligned. "
+            "Wait for a pullback into a relevant bullish zone "
+            "and require lower-timeframe confirmation before considering a long."
         )
 
+    elif market_bias == "Bearish":
+        game_plan = (
+            "Bearish conditions are better aligned. "
+            "Wait for a retracement into a relevant bearish zone "
+            "and require lower-timeframe confirmation before considering a short."
+        )
+
+    else:
+        game_plan = (
+            "Conditions are conflicting. Avoid forcing a trade and wait "
+            "for BOS, CHoCH, or stronger multi-timeframe alignment."
+        )
+
+    reasoning.insert(
+        0,
+        f"Overall market bias: {market_bias}.",
+    )
+
     return reasoning, confidence, score, game_plan
+
+    def generate_multi_timeframe_narrative(results):
+    """
+    Creates a single narrative from all analyzed timeframes.
+
+    results should look like:
+
+    [
+        {
+            "timeframe": "4 Hour",
+            "trend": "...",
+            "structure": "...",
+            "bos": ...,
+            "choch": ...
+        },
+        ...
+    ]
+    """
+
+    narrative = []
+
+    higher_timeframes = results[:-1]
+    lower_timeframe = results[-1]
+
+    bearish_htf = sum(
+        "BEARISH" in r["trend"]
+        for r in higher_timeframes
+    )
+
+    bullish_htf = sum(
+        "BULLISH" in r["trend"]
+        for r in higher_timeframes
+    )
+
+    if bearish_htf > bullish_htf:
+
+        narrative.append(
+            "Higher timeframes remain bearish."
+        )
+
+    elif bullish_htf > bearish_htf:
+
+        narrative.append(
+            "Higher timeframes remain bullish."
+        )
+
+    else:
+
+        narrative.append(
+            "Higher timeframes are mixed."
+        )
+
+    # Lower timeframe
+
+    if "BULLISH" in lower_timeframe["trend"]:
+
+        if bearish_htf > bullish_htf:
+
+            narrative.append(
+                "The lower timeframe is currently rallying against the higher timeframe trend."
+            )
+
+            narrative.append(
+                "This move may represent a pullback rather than a full trend reversal."
+            )
+
+        else:
+
+            narrative.append(
+                "The lower timeframe aligns with the higher timeframe trend."
+            )
+
+    elif "BEARISH" in lower_timeframe["trend"]:
+
+        if bullish_htf > bearish_htf:
+
+            narrative.append(
+                "The lower timeframe is pulling back against the higher timeframe trend."
+            )
+
+        else:
+
+            narrative.append(
+                "The lower timeframe remains aligned with the higher timeframe."
+            )
+
+    narrative.append(
+        "Wait for lower timeframe confirmation before entering."
+    )
+
+    return narrative

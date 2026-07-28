@@ -181,6 +181,17 @@ ai_reasoning, ai_confidence, ai_score, ai_game_plan = (
     )
 )
 
+market_snapshot = {
+    "trend": trend,
+    "structure": structure,
+    "bos": bos_status,
+    "choch": choch_status,
+    "bullish_fvgs": bullish_active_fvgs,
+    "bearish_fvgs": bearish_active_fvgs,
+    "equal_highs": equal_highs,
+    "equal_lows": equal_lows,
+}
+
 # ===== AI Dashboard =====
 
 col1, col2, col3, col4 = st.columns(4)
@@ -293,7 +304,7 @@ st.write("**Reasoning**")
 
 for reason in ai_reasoning:
     st.write(f"• {reason}")
-    
+
 display_tradingview_chart(
     data,
     high_labels=high_labels[-labels_to_show:],
