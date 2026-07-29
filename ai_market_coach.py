@@ -175,7 +175,7 @@ def generate_market_summary(
 
     return reasoning, confidence, score, game_plan
 
-    def generate_multi_timeframe_narrative(results):
+def generate_multi_timeframe_narrative(results):
     """
     Creates a single narrative from all analyzed timeframes.
 

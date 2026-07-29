@@ -294,16 +294,27 @@ coach_col1, coach_col2 = st.columns(2)
 
 with coach_col1:
     st.metric("Confidence", ai_confidence)
-    st.metric("Market Score", f"{ai_score}/100")
+
+    st.progress(ai_score / 100)
+
+    st.metric(
+        "Market Score",
+        f"{ai_score}/100"
+    )
 
 with coach_col2:
     st.write("**Game Plan**")
-    st.info(ai_game_plan)
+    st.success(
+        "🎯 Today's Plan\n\n"
+        + ai_game_plan
+    )
 
 st.write("**Reasoning**")
 
+st.write("### Key Reasons")
+
 for reason in ai_reasoning:
-    st.write(f"• {reason}")
+    st.markdown(f"✅ {reason}")
 
 display_tradingview_chart(
     data,
