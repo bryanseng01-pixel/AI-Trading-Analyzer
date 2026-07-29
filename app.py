@@ -1,5 +1,6 @@
 import streamlit as st
 
+from trade_checklist import generate_trade_checklist
 from ai_market_coach import generate_market_summary
 from fair_value_gap import detect_fair_value_gaps
 from data import get_market_data
@@ -63,10 +64,12 @@ symbol = "NQ=F"
 timeframes = {
     "4 Hour": "4h",
     "1 Hour": "1h",
-    "15 Minute": "15m"
+    "15 Minute": "15m",
+    "5 Minute": "5m",
+    "1 Minute": "1m",
 }
 
-bias_cols = st.columns(3)
+bias_cols = st.columns(len(timeframes))
 
 
 for index, (name, timeframe) in enumerate(timeframes.items()):
@@ -94,7 +97,13 @@ for index, (name, timeframe) in enumerate(timeframes.items()):
 # CHART SELECTOR
 selected = st.selectbox(
     "Chart Timeframe",
-    ["4 Hour", "1 Hour", "15 Minute"]
+    [
+        "4 Hour",
+        "1 Hour",
+        "15 Minute",
+        "5 Minute",
+        "1 Minute",
+    ],
 )
 
 
@@ -178,6 +187,16 @@ ai_reasoning, ai_confidence, ai_score, ai_game_plan = (
         bearish_active_fvgs,
         equal_highs,
         equal_lows,
+    )
+)
+trade_checklist, readiness_score, recommendation = (
+    generate_trade_checklist(
+        trend,
+        structure,
+        bos_status,
+        choch_status,
+        bullish_active_fvgs,
+        bearish_active_fvgs,
     )
 )
 
@@ -309,12 +328,39 @@ with coach_col2:
         + ai_game_plan
     )
 
-st.write("**Reasoning**")
 
 st.write("### Key Reasons")
 
 for reason in ai_reasoning:
     st.markdown(f"✅ {reason}")
+
+st.subheader("📋 Trade Readiness")
+
+readiness_col1, readiness_col2 = st.columns(2)
+
+with readiness_col1:
+    for item_name, is_ready in trade_checklist:
+        if is_ready:
+            st.markdown(f"✅ **{item_name}**")
+        else:
+            st.markdown(f"❌ **{item_name}**")
+
+with readiness_col2:
+    st.metric(
+        "Readiness Score",
+        f"{readiness_score}/100",
+    )
+
+    st.progress(readiness_score / 100)
+
+    if recommendation == "TRADE":
+        st.success("Recommendation: TRADE")
+
+    elif recommendation == "WATCH":
+        st.warning("Recommendation: WATCH")
+
+    else:
+        st.error("Recommendation: WAIT")
 
 display_tradingview_chart(
     data,
