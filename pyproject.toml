@@ -27,6 +27,7 @@ py-modules = [
     "analysis_pipeline",
     "ai_market_coach",
     "app",
+    "authority_market_story",
     "dashboard",
     "data",
     "decision_authority",
