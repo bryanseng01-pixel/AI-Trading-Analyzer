@@ -108,3 +108,13 @@ def test_select_active_fvgs_preserves_size_proximity_and_count_filters(
     )
 
     assert result == [analysis.fvgs[2]]
+
+
+def test_analyze_timeframe_accepts_a_one_candle_frame(ohlc_factory):
+    source = ohlc_factory([(100, 101, 99, 100, 10)])
+
+    result = analyze_timeframe(source, "1m")
+
+    assert result.data["EMA50"].iloc[0] == 100.0
+    assert result.trend == "BEARISH 🔴"
+    assert result.structure == "Not enough data"

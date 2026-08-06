@@ -37,3 +37,12 @@ def test_trend_reports_no_data_for_an_empty_analyzed_frame():
     data = pd.DataFrame(columns=["Close", "EMA50"])
 
     assert get_trend(data) == "NO DATA"
+
+
+def test_calculate_ema_preserves_a_series_for_one_candle(ohlc_factory):
+    data = ohlc_factory([(100, 101, 99, 100, 10)])
+
+    result = calculate_ema(data.copy())
+
+    assert result["EMA50"].iloc[0] == 100.0
+    assert get_trend(result) == "BEARISH 🔴"

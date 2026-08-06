@@ -2,7 +2,6 @@ def calculate_ema(data, period=50):
 
     data["EMA50"] = (
         data["Close"]
-        .squeeze()
         .ewm(span=period)
         .mean()
     )
@@ -16,7 +15,7 @@ def get_trend(data):
         return "NO DATA"
 
 
-    latest_close = data["Close"].squeeze().iloc[-1]
+    latest_close = data["Close"].iloc[-1]
     latest_ema = data["EMA50"].iloc[-1]
 
 
