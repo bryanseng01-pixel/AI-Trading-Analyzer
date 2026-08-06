@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trading-ai-analyzer"
+version = "0.1.0"
+description = "Streamlit-based ICT market analysis assistant for futures."
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=2.2,<4",
+    "streamlit>=1.40,<2",
+    "yfinance>=0.2.54,<2",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.3,<10",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.setuptools]
+py-modules = [
+    "ai_market_coach",
+    "app",
+    "dashboard",
+    "data",
+    "decision_engine",
+    "fair_value_gap",
+    "ict_playbook",
+    "indicators",
+    "liquidity",
+    "market_structure",
+    "order_blocks",
+    "sessions",
+    "structure",
+    "trade_checklist",
+    "tradingview_chart",
+]
