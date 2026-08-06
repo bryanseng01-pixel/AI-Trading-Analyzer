@@ -1,7 +1,6 @@
 import streamlit as st
 
 from analysis_pipeline import analyze_timeframe, select_active_fvgs
-from ict_playbook import evaluate_ict_liquidity_sweep_playbook
 from dashboard import render_market_brief
 from decision_authority import DecisionAuthority
 from sessions import detect_session_levels
@@ -214,40 +213,10 @@ ai_reasoning, ai_confidence, ai_score, ai_game_plan = (
     )
 )
 trade_plan = authority_decision.trade_plan
-htf_bias = market_story["context"]
-
-setup_structure = (
-    "bullish"
-    if "BULLISH" in timeframe_results["15 Minute"]["trend"]
-    else "bearish"
-    if "BEARISH" in timeframe_results["15 Minute"]["trend"]
-    else "mixed"
-)
-
-confirmation_structure = (
-    "bullish"
-    if "BULLISH" in timeframe_results["5 Minute"]["trend"]
-    else "bearish"
-    if "BEARISH" in timeframe_results["5 Minute"]["trend"]
-    else "mixed"
-)
-
-trigger_structure = (
-    "bullish"
-    if "BULLISH" in timeframe_results["1 Minute"]["trend"]
-    else "bearish"
-    if "BEARISH" in timeframe_results["1 Minute"]["trend"]
-    else "mixed"
-)
-
-ict_playbook = evaluate_ict_liquidity_sweep_playbook(
-    htf_bias=htf_bias,
-    setup_structure=setup_structure,
-    confirmation_structure=confirmation_structure,
-    trigger_structure=trigger_structure,
-    active_fvgs=active_fvgs,
-    session_levels=session_levels,
-)
+# Keep the existing coach panel, but route its actionable game plan through
+# the same authority that owns every displayed recommendation.
+ai_game_plan = trade_plan["next_action"]
+ict_playbook = authority_decision.playbook
 st.subheader("🎯 ICT Playbook")
 
 playbook_col1, playbook_col2, playbook_col3 = st.columns(3)
