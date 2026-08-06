@@ -10,6 +10,7 @@ from data import get_market_data
 from decision_authority import DecisionAuthority
 from market_structure import interpret_bias_and_structure
 from sessions import detect_session_levels
+from setup_overlay import build_setup_overlay
 from tradingview_chart import display_tradingview_chart
 
 
@@ -19,14 +20,6 @@ st.set_page_config(
     layout="wide",
 )
 st.sidebar.title("⚙️ Chart Settings")
-
-labels_to_show = st.sidebar.slider(
-    "Swing Labels",
-    min_value=2,
-    max_value=20,
-    value=6,
-    step=1,
-)
 st.sidebar.subheader("FVG Settings")
 minimum_fvg_size = st.sidebar.number_input(
     "Minimum FVG Size (points)",
@@ -97,6 +90,11 @@ authority_decision = DecisionAuthority().evaluate(
     minimum_fvg_size=minimum_fvg_size,
     maximum_fvgs=maximum_fvgs,
 )
+setup_overlay = build_setup_overlay(
+    authority_decision,
+    timeframe_analyses,
+    session_levels,
+)
 trade_plan = authority_decision.trade_plan
 playbook = authority_decision.playbook
 market_story = build_authority_market_story(authority_decision.roles)
@@ -111,13 +109,7 @@ chart_active_fvgs = select_active_fvgs(
 )
 display_tradingview_chart(
     selected_analysis.data,
-    high_labels=selected_analysis.high_labels[-labels_to_show:],
-    low_labels=selected_analysis.low_labels[-labels_to_show:],
-    bos=selected_analysis.bos,
-    choch=selected_analysis.choch,
-    equal_highs=selected_analysis.equal_highs[-3:],
-    equal_lows=selected_analysis.equal_lows[-3:],
-    fvgs=chart_active_fvgs,
+    setup_overlay=setup_overlay,
     height=700,
 )
 
