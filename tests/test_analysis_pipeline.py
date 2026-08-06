@@ -1,4 +1,10 @@
-from analysis_pipeline import TimeframeAnalysis, analyze_timeframe
+from dataclasses import replace
+
+from analysis_pipeline import (
+    TimeframeAnalysis,
+    analyze_timeframe,
+    select_active_fvgs,
+)
 
 
 def test_analyze_timeframe_returns_a_complete_independent_result(ohlc_factory):
@@ -53,3 +59,52 @@ def test_each_timeframe_analysis_owns_its_data_copy(ohlc_factory):
 
     assert one_minute.data["Close"].iloc[0] == 100.0
     assert source["Close"].iloc[0] == 100.0
+
+
+def test_select_active_fvgs_preserves_size_proximity_and_count_filters(
+    ohlc_factory,
+):
+    source = ohlc_factory(
+        [
+            (100, 101, 99, 100, 10),
+            (100, 101, 99, 100, 10),
+        ]
+    )
+    analysis = analyze_timeframe(source, "4h")
+    analysis = replace(
+        analysis,
+        fvgs=[
+            {
+                "type": "bullish",
+                "top": 94.0,
+                "bottom": 90.0,
+                "mitigated": False,
+            },
+            {
+                "type": "bullish",
+                "top": 99.0,
+                "bottom": 98.0,
+                "mitigated": False,
+            },
+            {
+                "type": "bearish",
+                "top": 102.0,
+                "bottom": 100.0,
+                "mitigated": False,
+            },
+            {
+                "type": "bearish",
+                "top": 101.0,
+                "bottom": 99.0,
+                "mitigated": True,
+            },
+        ],
+    )
+
+    result = select_active_fvgs(
+        analysis,
+        minimum_size=2.0,
+        maximum_count=1,
+    )
+
+    assert result == [analysis.fvgs[2]]

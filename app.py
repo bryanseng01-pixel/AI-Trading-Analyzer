@@ -1,5 +1,6 @@
 import streamlit as st
 
+from analysis_pipeline import analyze_timeframe, select_active_fvgs
 from ict_playbook import evaluate_ict_liquidity_sweep_playbook
 from dashboard import render_market_brief
 from decision_engine import build_trade_plan
@@ -9,21 +10,9 @@ from ai_market_coach import (
     generate_market_summary,
     build_market_story,
 )
-from fair_value_gap import detect_fair_value_gaps
 from data import get_market_data
-from indicators import calculate_ema, get_trend
-from structure import find_swing_points
 from market_structure import (
-    label_highs,
-    label_lows,
-    determine_structure,
     interpret_bias_and_structure,
-    detect_bos,
-    detect_choch,
-)
-from liquidity import (
-    find_equal_highs,
-    find_equal_lows,
 )
 from tradingview_chart import display_tradingview_chart
 
@@ -106,6 +95,7 @@ timeframes = {
 }
 
 timeframe_results = {}
+timeframe_analyses = {}
 
 bias_cols = st.columns(len(timeframes))
 
@@ -115,13 +105,15 @@ for index, (name, info) in enumerate(timeframes.items()):
     role = info["role"]
 
     bias_data = get_market_data(symbol, timeframe)
-    bias_data = calculate_ema(bias_data)
-    bias = get_trend(bias_data)
+    analysis = analyze_timeframe(bias_data, timeframe)
+    bias = analysis.trend
+
+    timeframe_analyses[name] = analysis
 
     timeframe_results[name] = {
         "timeframe": timeframe,
         "trend": bias,
-        "data": bias_data,
+        "data": analysis.data,
         "role": role,
     }
 
@@ -158,66 +150,44 @@ selected = st.selectbox(
 
  # Convert selected name into Yahoo timeframe
 
-selected_timeframe = timeframes[selected]["interval"]
+selected_analysis = timeframe_analyses[selected]
 
-data = get_market_data(
-    symbol,
-    selected_timeframe,
-)
+# Preserve the former default (4H) strategy basis while making the chart
+# selector presentation-only. A later strategy change can explicitly route
+# each playbook stage to its intended timeframe.
+strategy_analysis = timeframe_analyses["4 Hour"]
 
-data = calculate_ema(data)
-
-trend = get_trend(data)
-
-highs, lows = find_swing_points(data)
-
-equal_highs = find_equal_highs(highs, tolerance=5.0)
-equal_lows = find_equal_lows(lows, tolerance=5.0)
-
-high_labels = label_highs(highs)
-low_labels = label_lows(lows)
-
-structure = determine_structure(
-    high_labels,
-    low_labels,
-)
+data = strategy_analysis.data
+trend = strategy_analysis.trend
+highs = strategy_analysis.highs
+lows = strategy_analysis.lows
+equal_highs = strategy_analysis.equal_highs
+equal_lows = strategy_analysis.equal_lows
+high_labels = strategy_analysis.high_labels
+low_labels = strategy_analysis.low_labels
+structure = strategy_analysis.structure
 market_summary = interpret_bias_and_structure(
     trend,
     structure,
 )
-bos_status = detect_bos(
-    data,
-    high_labels,
-    low_labels,
-    structure,
-)
-choch_status = detect_choch(
-    data,
-    high_labels,
-    low_labels,
-    structure,
-)
+bos_status = strategy_analysis.bos
+choch_status = strategy_analysis.choch
 
-fvgs = detect_fair_value_gaps(data)
-session_data = get_market_data(symbol, "5m")
+fvgs = strategy_analysis.fvgs
+session_data = timeframe_analyses["5 Minute"].data
 session_levels = detect_session_levels(session_data) or {}
 
-current_price = float(data["Close"].iloc[-1])
-
-active_fvgs = [
-    fvg
-    for fvg in fvgs
-    if not fvg["mitigated"]
-    and (fvg["top"] - fvg["bottom"]) >= minimum_fvg_size
-]
-
-active_fvgs.sort(
-    key=lambda fvg: abs(
-        ((fvg["top"] + fvg["bottom"]) / 2) - current_price
-    )
+active_fvgs = select_active_fvgs(
+    strategy_analysis,
+    minimum_size=minimum_fvg_size,
+    maximum_count=maximum_fvgs,
 )
 
-active_fvgs = active_fvgs[:maximum_fvgs]
+chart_active_fvgs = select_active_fvgs(
+    selected_analysis,
+    minimum_size=minimum_fvg_size,
+    maximum_count=maximum_fvgs,
+)
 
 bullish_active_fvgs = [
     fvg for fvg in active_fvgs
@@ -566,13 +536,13 @@ with st.expander("Why this decision?"):
             st.markdown(f"⏳ {item}")
 
 display_tradingview_chart(
-    data,
-    high_labels=high_labels[-labels_to_show:],
-    low_labels=low_labels[-labels_to_show:],
-    bos=bos_status,
-    choch=choch_status,
-    equal_highs=equal_highs[-3:],
-    equal_lows=equal_lows[-3:],
-    fvgs=active_fvgs,
+    selected_analysis.data,
+    high_labels=selected_analysis.high_labels[-labels_to_show:],
+    low_labels=selected_analysis.low_labels[-labels_to_show:],
+    bos=selected_analysis.bos,
+    choch=selected_analysis.choch,
+    equal_highs=selected_analysis.equal_highs[-3:],
+    equal_lows=selected_analysis.equal_lows[-3:],
+    fvgs=chart_active_fvgs,
     height=700,
 )

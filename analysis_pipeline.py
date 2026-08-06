@@ -90,3 +90,29 @@ def analyze_timeframe(
             tolerance=liquidity_tolerance,
         ),
     )
+
+
+def select_active_fvgs(
+    analysis: TimeframeAnalysis,
+    *,
+    minimum_size: float,
+    maximum_count: int,
+) -> list[dict[str, Any]]:
+    """Apply the dashboard's existing active-FVG filters to one analysis."""
+
+    if analysis.data.empty:
+        return []
+
+    current_price = float(analysis.data["Close"].iloc[-1])
+    active_fvgs = [
+        fvg
+        for fvg in analysis.fvgs
+        if not fvg["mitigated"]
+        and (fvg["top"] - fvg["bottom"]) >= minimum_size
+    ]
+    active_fvgs.sort(
+        key=lambda fvg: abs(
+            ((fvg["top"] + fvg["bottom"]) / 2) - current_price
+        )
+    )
+    return active_fvgs[:maximum_count]
