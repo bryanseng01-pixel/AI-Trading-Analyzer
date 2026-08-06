@@ -29,6 +29,7 @@ py-modules = [
     "app",
     "dashboard",
     "data",
+    "decision_authority",
     "decision_engine",
     "fair_value_gap",
     "ict_playbook",

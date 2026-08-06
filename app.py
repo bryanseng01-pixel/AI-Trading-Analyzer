@@ -3,7 +3,7 @@ import streamlit as st
 from analysis_pipeline import analyze_timeframe, select_active_fvgs
 from ict_playbook import evaluate_ict_liquidity_sweep_playbook
 from dashboard import render_market_brief
-from decision_engine import build_trade_plan
+from decision_authority import DecisionAuthority
 from sessions import detect_session_levels
 from trade_checklist import generate_trade_checklist
 from ai_market_coach import (
@@ -177,11 +177,13 @@ fvgs = strategy_analysis.fvgs
 session_data = timeframe_analyses["5 Minute"].data
 session_levels = detect_session_levels(session_data) or {}
 
-active_fvgs = select_active_fvgs(
-    strategy_analysis,
-    minimum_size=minimum_fvg_size,
-    maximum_count=maximum_fvgs,
+authority_decision = DecisionAuthority().evaluate(
+    timeframe_analyses,
+    session_levels,
+    minimum_fvg_size=minimum_fvg_size,
+    maximum_fvgs=maximum_fvgs,
 )
+active_fvgs = authority_decision.active_fvgs
 
 chart_active_fvgs = select_active_fvgs(
     selected_analysis,
@@ -211,15 +213,7 @@ ai_reasoning, ai_confidence, ai_score, ai_game_plan = (
         equal_lows,
     )
 )
-trade_plan = build_trade_plan(
-    trend,
-    structure,
-    bos_status,
-    choch_status,
-    bullish_active_fvgs,
-    bearish_active_fvgs,
-    session_levels,
-)
+trade_plan = authority_decision.trade_plan
 htf_bias = market_story["context"]
 
 setup_structure = (
@@ -300,7 +294,7 @@ render_market_brief(
     market_story,
     ict_playbook,
 )
-trade_checklist, readiness_score, recommendation = (
+trade_checklist, readiness_score, _legacy_recommendation = (
     generate_trade_checklist(
         trend,
         structure,
@@ -466,11 +460,14 @@ with readiness_col2:
 
     st.progress(readiness_score / 100)
 
-    if recommendation == "TRADE":
-        st.success("Recommendation: TRADE")
+    if authority_decision.recommendation == "READY":
+        st.success("Recommendation: READY")
 
-    elif recommendation == "WATCH":
+    elif authority_decision.recommendation == "WATCH":
         st.warning("Recommendation: WATCH")
+
+    elif authority_decision.recommendation == "AVOID":
+        st.error("Recommendation: AVOID")
 
     else:
         st.error("Recommendation: WAIT")
