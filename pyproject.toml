@@ -39,6 +39,7 @@ py-modules = [
     "order_blocks",
     "sessions",
     "structure",
+    "timeframe_roles",
     "trade_checklist",
     "tradingview_chart",
 ]
