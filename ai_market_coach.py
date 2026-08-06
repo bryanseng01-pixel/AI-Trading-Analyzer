@@ -265,3 +265,132 @@ def generate_multi_timeframe_narrative(results):
     )
 
     return narrative
+
+def build_market_story(timeframe_results):
+    """
+    Combine the 4H, 1H, 15M, 5M, and 1M trends
+    into one clear market narrative.
+    """
+
+    four_hour = timeframe_results["4 Hour"]["trend"]
+    one_hour = timeframe_results["1 Hour"]["trend"]
+    fifteen_minute = timeframe_results["15 Minute"]["trend"]
+    five_minute = timeframe_results["5 Minute"]["trend"]
+    one_minute = timeframe_results["1 Minute"]["trend"]
+
+    story = []
+
+    htf_bullish = (
+        "BULLISH" in four_hour
+        and "BULLISH" in one_hour
+    )
+
+    htf_bearish = (
+        "BEARISH" in four_hour
+        and "BEARISH" in one_hour
+    )
+
+    if htf_bullish:
+        context = "Bullish"
+        story.append(
+            "The 4-hour and 1-hour timeframes are aligned bullish."
+        )
+
+    elif htf_bearish:
+        context = "Bearish"
+        story.append(
+            "The 4-hour and 1-hour timeframes are aligned bearish."
+        )
+
+    else:
+        context = "Mixed"
+        story.append(
+            "The higher timeframes are not fully aligned."
+        )
+
+    if context == "Bearish" and "BULLISH" in fifteen_minute:
+        setup = "Bullish pullback"
+        story.append(
+            "The 15-minute chart is rallying against the higher-timeframe bearish trend."
+        )
+        story.append(
+            "This currently looks more like a pullback than a confirmed bullish reversal."
+        )
+
+    elif context == "Bullish" and "BEARISH" in fifteen_minute:
+        setup = "Bearish pullback"
+        story.append(
+            "The 15-minute chart is pulling back against the higher-timeframe bullish trend."
+        )
+        story.append(
+            "This currently looks more like a retracement than a confirmed bearish reversal."
+        )
+
+    elif context == "Bearish" and "BEARISH" in fifteen_minute:
+        setup = "Bearish continuation"
+        story.append(
+            "The 15-minute chart remains aligned with the bearish higher-timeframe trend."
+        )
+
+    elif context == "Bullish" and "BULLISH" in fifteen_minute:
+        setup = "Bullish continuation"
+        story.append(
+            "The 15-minute chart remains aligned with the bullish higher-timeframe trend."
+        )
+
+    else:
+        setup = "Unclear"
+        story.append(
+            "The 15-minute setup is currently unclear."
+        )
+
+    if context == "Bearish":
+        five_minute_confirmed = "BEARISH" in five_minute
+        one_minute_confirmed = "BEARISH" in one_minute
+
+    elif context == "Bullish":
+        five_minute_confirmed = "BULLISH" in five_minute
+        one_minute_confirmed = "BULLISH" in one_minute
+
+    else:
+        five_minute_confirmed = False
+        one_minute_confirmed = False
+
+    if five_minute_confirmed:
+        story.append(
+            "The 5-minute chart supports the higher-timeframe direction."
+        )
+    else:
+        story.append(
+            "The 5-minute chart has not confirmed the higher-timeframe direction yet."
+        )
+
+    if one_minute_confirmed:
+        execution = "Confirmed"
+        story.append(
+            "The 1-minute chart is aligned for execution."
+        )
+    else:
+        execution = "Waiting"
+        story.append(
+            "The 1-minute execution trigger is still missing."
+        )
+
+    if context == "Mixed":
+        decision = "AVOID"
+
+    elif five_minute_confirmed and one_minute_confirmed:
+        decision = "WATCH"
+
+    else:
+        decision = "WAIT"
+
+    return {
+        "context": context,
+        "setup": setup,
+        "execution": execution,
+        "decision": decision,
+        "story": story,
+    }
+
+    

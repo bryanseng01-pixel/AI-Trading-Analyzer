@@ -1,7 +1,8 @@
 import yfinance as yf
 import pandas as pd
+import streamlit as st
 
-
+@st.cache_data(ttl=15)
 def get_market_data(symbol, timeframe):
 
     # 4-hour candles are created from 1-hour data

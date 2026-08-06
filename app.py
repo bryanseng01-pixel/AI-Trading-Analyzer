@@ -1,7 +1,14 @@
 import streamlit as st
 
+from ict_playbook import evaluate_ict_liquidity_sweep_playbook
+from dashboard import render_market_brief
+from decision_engine import build_trade_plan
+from sessions import detect_session_levels
 from trade_checklist import generate_trade_checklist
-from ai_market_coach import generate_market_summary
+from ai_market_coach import (
+    generate_market_summary,
+    build_market_story,
+)
 from fair_value_gap import detect_fair_value_gaps
 from data import get_market_data
 from indicators import calculate_ema, get_trend
@@ -19,6 +26,9 @@ from liquidity import (
     find_equal_lows,
 )
 from tradingview_chart import display_tradingview_chart
+
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 # Page settings
 st.set_page_config(
@@ -52,8 +62,19 @@ maximum_fvgs = st.sidebar.slider(
     max_value=10,
     value=3,
 )
+if st.sidebar.button("🔄 Refresh Market Data"):
+    st.cache_data.clear()
+    st.rerun()
 
 st.title("📈 AI Trading Analyzer")
+last_updated = datetime.now(
+    ZoneInfo("America/New_York")
+)
+
+st.caption(
+    "Last refreshed: "
+    + last_updated.strftime("%I:%M:%S %p ET")
+)
 
 st.write("Multi-Timeframe Market Bias")
 
@@ -62,28 +83,52 @@ symbol = "NQ=F"
 
 
 timeframes = {
-    "4 Hour": "4h",
-    "1 Hour": "1h",
-    "15 Minute": "15m",
-    "5 Minute": "5m",
-    "1 Minute": "1m",
+    "4 Hour": {
+        "interval": "4h",
+        "role": "🧭 Context",
+    },
+    "1 Hour": {
+        "interval": "1h",
+        "role": "✅ Confirmation",
+    },
+    "15 Minute": {
+        "interval": "15m",
+        "role": "📈 Setup",
+    },
+    "5 Minute": {
+        "interval": "5m",
+        "role": "🔍 Confirmation",
+    },
+    "1 Minute": {
+        "interval": "1m",
+        "role": "⚡ Trigger",
+    },
 }
+
+timeframe_results = {}
 
 bias_cols = st.columns(len(timeframes))
 
+for index, (name, info) in enumerate(timeframes.items()):
 
-for index, (name, timeframe) in enumerate(timeframes.items()):
+    timeframe = info["interval"]
+    role = info["role"]
 
     bias_data = get_market_data(symbol, timeframe)
-
     bias_data = calculate_ema(bias_data)
-
     bias = get_trend(bias_data)
 
+    timeframe_results[name] = {
+        "timeframe": timeframe,
+        "trend": bias,
+        "data": bias_data,
+        "role": role,
+    }
 
     with bias_cols[index]:
 
-        st.subheader(name)
+        st.caption(role)
+        st.markdown(f"**{name}**")
 
         if "BULLISH" in bias:
             st.success(bias)
@@ -93,6 +138,10 @@ for index, (name, timeframe) in enumerate(timeframes.items()):
 
         else:
             st.warning(bias)
+
+market_story = build_market_story(timeframe_results)
+
+
 
 # CHART SELECTOR
 selected = st.selectbox(
@@ -109,12 +158,12 @@ selected = st.selectbox(
 
  # Convert selected name into Yahoo timeframe
 
-selected_timeframe = timeframes[selected]
+selected_timeframe = timeframes[selected]["interval"]
 
-
-# Load selected chart data
-
-data = get_market_data(symbol, selected_timeframe)
+data = get_market_data(
+    symbol,
+    selected_timeframe,
+)
 
 data = calculate_ema(data)
 
@@ -150,6 +199,9 @@ choch_status = detect_choch(
 )
 
 fvgs = detect_fair_value_gaps(data)
+session_data = get_market_data(symbol, "5m")
+session_levels = detect_session_levels(session_data) or {}
+
 current_price = float(data["Close"].iloc[-1])
 
 active_fvgs = [
@@ -189,6 +241,95 @@ ai_reasoning, ai_confidence, ai_score, ai_game_plan = (
         equal_lows,
     )
 )
+trade_plan = build_trade_plan(
+    trend,
+    structure,
+    bos_status,
+    choch_status,
+    bullish_active_fvgs,
+    bearish_active_fvgs,
+    session_levels,
+)
+htf_bias = market_story["context"]
+
+setup_structure = (
+    "bullish"
+    if "BULLISH" in timeframe_results["15 Minute"]["trend"]
+    else "bearish"
+    if "BEARISH" in timeframe_results["15 Minute"]["trend"]
+    else "mixed"
+)
+
+confirmation_structure = (
+    "bullish"
+    if "BULLISH" in timeframe_results["5 Minute"]["trend"]
+    else "bearish"
+    if "BEARISH" in timeframe_results["5 Minute"]["trend"]
+    else "mixed"
+)
+
+trigger_structure = (
+    "bullish"
+    if "BULLISH" in timeframe_results["1 Minute"]["trend"]
+    else "bearish"
+    if "BEARISH" in timeframe_results["1 Minute"]["trend"]
+    else "mixed"
+)
+
+ict_playbook = evaluate_ict_liquidity_sweep_playbook(
+    htf_bias=htf_bias,
+    setup_structure=setup_structure,
+    confirmation_structure=confirmation_structure,
+    trigger_structure=trigger_structure,
+    active_fvgs=active_fvgs,
+    session_levels=session_levels,
+)
+st.subheader("🎯 ICT Playbook")
+
+playbook_col1, playbook_col2, playbook_col3 = st.columns(3)
+
+with playbook_col1:
+    st.metric(
+        "Playbook",
+        ict_playbook["playbook"],
+    )
+
+with playbook_col2:
+    st.metric(
+        "Direction",
+        ict_playbook["direction"] or "None",
+    )
+
+with playbook_col3:
+    st.metric(
+        "Status",
+        ict_playbook["status"],
+    )
+
+st.write(f'**Current Phase:** {ict_playbook["phase"]}')
+
+st.info(
+    "Next Event: "
+    + ict_playbook["next_event"]
+)
+
+with st.expander("ICT Setup Details"):
+    if ict_playbook["reasons"]:
+        st.write("**Confirmed:**")
+
+        for reason in ict_playbook["reasons"]:
+            st.markdown(f"✅ {reason}")
+
+    if ict_playbook["missing"]:
+        st.write("**Still Missing:**")
+
+        for item in ict_playbook["missing"]:
+            st.markdown(f"⏳ {item}")
+render_market_brief(
+    trade_plan,
+    market_story,
+    ict_playbook,
+)
 trade_checklist, readiness_score, recommendation = (
     generate_trade_checklist(
         trend,
@@ -213,56 +354,58 @@ market_snapshot = {
 
 # ===== AI Dashboard =====
 
-col1, col2, col3, col4 = st.columns(4)
+with st.expander("📊 Technical Details", expanded=False):
 
-with col1:
-    st.subheader("Trend")
+    col1, col2, col3, col4 = st.columns(4)
 
-    if "BULLISH" in trend:
-        st.success(trend)
-    elif "BEARISH" in trend:
-        st.error(trend)
-    else:
-        st.warning(trend)
+    with col1:
+        st.subheader("Trend")
 
-
-with col2:
-    st.subheader("Structure")
-    st.info(structure)
+        if "BULLISH" in trend:
+            st.success(trend)
+        elif "BEARISH" in trend:
+            st.error(trend)
+        else:
+            st.warning(trend)
 
 
-with col3:
-    st.subheader("BOS")
-
-    if bos_status is None:
-        st.info("No BOS detected")
-
-    elif bos_status["direction"] == "bullish":
-        st.success(
-            f'Bullish BOS at {bos_status["time"]}'
-        )
-
-    elif bos_status["direction"] == "bearish":
-        st.error(
-            f'Bearish BOS at {bos_status["time"]}'
-        )
+    with col2:
+        st.subheader("Structure")
+        st.info(structure)
 
 
-with col4:
-    st.subheader("CHoCH")
+    with col3:
+        st.subheader("BOS")
 
-    if choch_status is None:
-        st.info("No CHoCH detected")
+        if bos_status is None:
+            st.info("No BOS detected")
 
-    elif choch_status["direction"] == "bullish":
-        st.success(
-            f'Bullish CHoCH at {choch_status["time"]}'
-        )
+        elif bos_status["direction"] == "bullish":
+            st.success(
+                f'Bullish BOS at {bos_status["time"]}'
+            )
 
-    elif choch_status["direction"] == "bearish":
-        st.error(
-            f'Bearish CHoCH at {choch_status["time"]}'
-        )
+        elif bos_status["direction"] == "bearish":
+            st.error(
+                f'Bearish BOS at {bos_status["time"]}'
+            )
+
+
+    with col4:
+        st.subheader("CHoCH")
+
+        if choch_status is None:
+            st.info("No CHoCH detected")
+
+        elif choch_status["direction"] == "bullish":
+            st.success(
+                f'Bullish CHoCH at {choch_status["time"]}'
+            )
+
+        elif choch_status["direction"] == "bearish":
+            st.error(
+                f'Bearish CHoCH at {choch_status["time"]}'
+            )
 
 
 st.subheader("🧠 AI Market Summary")
@@ -361,6 +504,66 @@ with readiness_col2:
 
     else:
         st.error("Recommendation: WAIT")
+
+st.subheader("Session Liquidity")
+
+session_columns = st.columns(3)
+
+session_names = ["Asia", "London", "New York"]
+
+for index, session_name in enumerate(session_names):
+    with session_columns[index]:
+        session = session_levels.get(session_name)
+
+        if session is None:
+            st.info(f"{session_name}: No data")
+
+        else:
+            high_status = "Swept" if session["high_swept"] else "Untouched"
+            low_status = "Swept" if session["low_swept"] else "Untouched"
+
+            st.metric(
+                f"{session_name} High",
+                f'{session["high"]:.2f}',
+                delta=high_status,
+            )
+
+            st.metric(
+                f"{session_name} Low",
+                f'{session["low"]:.2f}',
+                delta=low_status,
+            )
+
+st.subheader("🧠 Decision Engine")
+
+decision_col1, decision_col2, decision_col3 = st.columns(3)
+
+with decision_col1:
+    st.metric("Status", trade_plan["status"])
+
+with decision_col2:
+    st.metric("Bias", trade_plan["bias"])
+
+with decision_col3:
+    st.metric(
+        "Confidence",
+        f'{trade_plan["confidence"]}/100',
+    )
+
+st.progress(trade_plan["confidence"] / 100)
+
+st.write("**Next Action**")
+st.info(trade_plan["next_action"])
+
+with st.expander("Why this decision?"):
+    for reason in trade_plan["reasons"]:
+        st.markdown(f"✅ {reason}")
+
+    if trade_plan["missing"]:
+        st.write("**Still missing:**")
+
+        for item in trade_plan["missing"]:
+            st.markdown(f"⏳ {item}")
 
 display_tradingview_chart(
     data,
