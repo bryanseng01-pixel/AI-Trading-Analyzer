@@ -39,6 +39,7 @@ py-modules = [
     "market_structure",
     "order_blocks",
     "sessions",
+    "setup_overlay",
     "structure",
     "timeframe_roles",
     "trade_checklist",
