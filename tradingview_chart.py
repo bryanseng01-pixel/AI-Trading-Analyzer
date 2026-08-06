@@ -3,6 +3,8 @@ import json
 import pandas as pd
 import streamlit.components.v1 as components
 
+from setup_overlay import SetupOverlay
+
 
 def display_tradingview_chart(
     data: pd.DataFrame,
@@ -13,6 +15,7 @@ def display_tradingview_chart(
     equal_highs=None,
     equal_lows=None,
     fvgs=None,
+    setup_overlay: SetupOverlay | None = None,
     height: int = 700,
 ) -> None:
 
@@ -167,6 +170,9 @@ def display_tradingview_chart(
         )
 
     fvg_json = json.dumps(active_fvgs)
+    setup_overlay_json = json.dumps(
+        _serialize_setup_overlay(setup_overlay)
+    )
     
     html_code = f"""
     <!DOCTYPE html>
@@ -190,11 +196,27 @@ def display_tradingview_chart(
                 width: 100%;
                 height: {height}px;
             }}
+
+            #setup-summary {{
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                z-index: 10;
+                max-width: 440px;
+                padding: 8px 10px;
+                border: 1px solid #374151;
+                border-radius: 4px;
+                color: #d1d4dc;
+                background: rgba(14, 17, 23, 0.88);
+                font: 12px sans-serif;
+                pointer-events: none;
+            }}
         </style>
     </head>
 
     <body>
         <div id="chart"></div>
+        <div id="setup-summary"></div>
 
         <script>
             const chartContainer = document.getElementById("chart");
@@ -311,6 +333,7 @@ def display_tradingview_chart(
 
             const liquidityData = {liquidity_json};
             const fvgData = {fvg_json};
+            const setupOverlayData = {setup_overlay_json};
 
             liquidityData.forEach((level) => {{
 
@@ -378,6 +401,69 @@ def display_tradingview_chart(
 
             }});
 
+            const overlaySummary = document.getElementById("setup-summary");
+
+            if (setupOverlayData === null) {{
+                overlaySummary.style.display = "none";
+            }} else {{
+                overlaySummary.innerHTML = setupOverlayData.annotations
+                    .map((text) => `<div>${{text}}</div>`)
+                    .join("");
+
+                setupOverlayData.levels.forEach((level) => {{
+                    const levelColor =
+                        level.role === "liquidity"
+                            ? "#ffb300"
+                            : level.state === "confirmed_by_close"
+                            ? "#26a69a"
+                            : "#42a5f5";
+
+                    candleSeries.createPriceLine({{
+                        price: level.price,
+                        color: levelColor,
+                        lineWidth: level.importance === "primary" ? 2 : 1,
+                        lineStyle:
+                            level.state === "confirmed_by_close"
+                                ? LightweightCharts.LineStyle.Solid
+                                : LightweightCharts.LineStyle.Dashed,
+                        axisLabelVisible: true,
+                        title: level.label
+                    }});
+                }});
+
+                if (setupOverlayData.execution_zone !== null) {{
+                    const zone = setupOverlayData.execution_zone;
+                    const zoneColor =
+                        zone.direction === "bullish"
+                            ? "rgba(38, 166, 154, 0.28)"
+                            : "rgba(239, 83, 80, 0.28)";
+                    const zoneBorder =
+                        zone.direction === "bullish" ? "#26a69a" : "#ef5350";
+                    const zoneSeries = chart.addSeries(
+                        LightweightCharts.BaselineSeries,
+                        {{
+                            baseValue: {{ type: "price", price: zone.bottom }},
+                            topFillColor1: zoneColor,
+                            topFillColor2: zoneColor,
+                            bottomFillColor1: zoneColor,
+                            bottomFillColor2: zoneColor,
+                            topLineColor: zoneBorder,
+                            bottomLineColor: zoneBorder,
+                            lineWidth: 2,
+                            priceLineVisible: false,
+                            lastValueVisible: false
+                        }}
+                    );
+                    zoneSeries.setData([
+                        {{ time: zone.start_time, value: zone.top }},
+                        {{
+                            time: candleData[candleData.length - 1].time,
+                            value: zone.top
+                        }}
+                    ]);
+                }}
+            }}
+
             chart.timeScale().fitContent();
 
             const resizeObserver = new ResizeObserver(() => {{
@@ -397,3 +483,88 @@ def display_tradingview_chart(
         height=height,
         scrolling=False,
     )
+
+
+def _serialize_setup_overlay(
+    overlay: SetupOverlay | None,
+) -> dict | None:
+    """Serialize a completed overlay without deriving any strategy state."""
+
+    if overlay is None:
+        return None
+
+    levels = []
+    seen = set()
+
+    def add_level(level, visible):
+        if not visible or level is None:
+            return
+        key = (level.role.value, level.price, level.label)
+        if key in seen:
+            return
+        seen.add(key)
+        levels.append(
+            {
+                "price": level.price,
+                "timeframe": level.timeframe,
+                "role": level.role.value,
+                "state": level.state.value,
+                "label": level.label,
+                "event_type": level.event_type,
+                "timestamp": (
+                    int(level.timestamp.timestamp())
+                    if level.timestamp is not None
+                    else None
+                ),
+                "source": level.source,
+                "importance": level.importance,
+            }
+        )
+
+    visibility = overlay.visibility
+    add_level(
+        overlay.primary_waiting_level,
+        visibility.show_primary_waiting_level,
+    )
+    add_level(
+        overlay.relevant_liquidity_level,
+        visibility.show_liquidity_level,
+    )
+    add_level(
+        overlay.confirmation_level_5m,
+        visibility.show_confirmation_level,
+    )
+    add_level(
+        overlay.trigger_level_1m,
+        visibility.show_trigger_level,
+    )
+
+    execution_zone = None
+    zone = overlay.active_execution_zone
+    if visibility.show_execution_zone and zone is not None:
+        execution_zone = {
+            "top": zone.top,
+            "bottom": zone.bottom,
+            "timeframe": zone.timeframe,
+            "direction": zone.direction.value,
+            "label": zone.label,
+            "start_time": int(zone.start_time.timestamp()),
+            "formation_end_time": int(zone.formation_end_time.timestamp()),
+            "source": zone.source,
+            "importance": zone.importance,
+        }
+
+    return {
+        "active_playbook": overlay.active_playbook,
+        "authority_status": overlay.authority_status,
+        "direction": overlay.direction.value if overlay.direction else None,
+        "current_phase": overlay.current_phase,
+        "next_required_event": overlay.next_required_event,
+        "progress_step": overlay.progress_step,
+        "total_steps": overlay.total_steps,
+        "completion_percentage": overlay.completion_percentage,
+        "levels": levels,
+        "execution_zone": execution_zone,
+        "annotations": [annotation.text for annotation in overlay.annotations],
+        "limitations": list(overlay.limitations),
+    }
