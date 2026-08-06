@@ -24,6 +24,7 @@ testpaths = ["tests"]
 
 [tool.setuptools]
 py-modules = [
+    "analysis_pipeline",
     "ai_market_coach",
     "app",
     "dashboard",
