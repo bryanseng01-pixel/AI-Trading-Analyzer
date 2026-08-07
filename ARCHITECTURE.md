@@ -90,6 +90,8 @@ The main page shows authority outputs, the selected chart, authority-gate progre
 | `dashboard.py` | Primary authority summary and authority-only gate progress | Active presentation |
 | `tradingview_chart.py` | Converts analysis results to Lightweight Charts candles and annotations | Active presentation |
 | `order_blocks.py` | Basic order-block detector | Retained, currently unused |
+| `order_block_engine.py` | Typed structural Order Block formation, qualified displacement, lifecycle, and deterministic overlap selection | Active analytical engine; non-authoritative |
+| `order_block_integration.py` | Adapts completed Order Block overlay support into one optional, non-required confluence factor | Active non-authoritative adapter |
 | `ai_market_coach.py` | Earlier scoring, narrative, and game-plan functions | Legacy, non-authoritative |
 | `decision_engine.py` | Earlier weighted trade-plan builder | Legacy, non-authoritative |
 | `trade_checklist.py` | Earlier readiness checklist and recommendation | Legacy, non-authoritative |
@@ -168,7 +170,17 @@ unchanged. IFVG cannot substitute for the authority FVG.
 
 ### Order blocks
 
-Order-block analysis should be integrated through a typed zone contract after its formation, validity, mitigation, and invalidation rules are approved. The current basic detector is not part of the authority path.
+`order_block_engine.py` requires an existing close-confirmed BOS or CHoCH,
+qualified displacement, and a bounded opposing source candle. It uses the full
+source-candle range and tracks untouched, touched, partially mitigated, fully
+mitigated, and close-invalidated states. Setup Overlay may project at most one
+active directional 1M block with strict positive overlap against the visible
+authority FVG. Confluence receives only the completed optional factor and does
+not calculate blocks from candles.
+
+The earlier `order_blocks.py` color-transition detector remains unchanged for
+legacy compatibility and is non-authoritative. Neither detector changes
+DecisionAuthority status, confidence, direction, phase, or gates.
 
 ### Order-flow provider
 
@@ -198,5 +210,6 @@ The future swing-options engine must be a separate strategy system with separate
 - Yahoo availability, history limits, and candle construction can affect results.
 - No true bid/ask order flow is available.
 - IFVG lifecycle, optional overlay, chart, and confluence integration exist; IFVG authority behavior is intentionally not implemented.
+- Order Block location evidence is optional and has no authority role.
 - Volume profile, execution planning, entries, stops, targets, and sizing are not implemented.
 - Stronger 15M thesis-invalidation rules remain undefined.

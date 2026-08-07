@@ -90,6 +90,11 @@ The current temporary execution-location gate requires at least one active 1M FV
 
 This is an availability gate, not a complete execution plan. The current system does not define an entry price, retracement requirement, stop, target, or risk/reward threshold. A close-confirmed active 1M IFVG may appear as optional confluence only when it directionally and geometrically overlaps the authority-selected FVG. It does not satisfy or replace this playbook's authority FVG gate.
 
+A structurally formed, active directional 1M Order Block may also appear as
+optional confluence when it strictly overlaps the same authority FVG. It does
+not satisfy or replace any playbook gate and cannot change playbook status or
+phase.
+
 ## Long sequence
 
 The current long sequence is:

@@ -53,7 +53,7 @@ Version 1 establishes the current day-trading platform:
 
 - Continue validating the implemented typed FVG lifecycle and its optional overlay/confluence projection.
 - Keep close-confirmed IFVG evidence outside authority unless a later, separately approved playbook change defines it as a gate.
-- Approve and integrate order-block formation, validity, mitigation, and invalidation rules.
+- Continue validating the implemented structural Order Block engine and its optional overlay/confluence projection without promoting it to an authority gate.
 - Refine liquidity-pool lifecycle and session selection.
 - Define stronger 15M thesis-reversal and invalidation rules.
 - Improve the relationship among setup structure, liquidity event, and execution location.
