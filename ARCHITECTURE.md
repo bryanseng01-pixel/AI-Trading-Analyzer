@@ -80,6 +80,7 @@ The main page shows authority outputs, the selected chart, authority-gate progre
 | `liquidity.py` | Equal-high and equal-low detection using a point tolerance | Active |
 | `fair_value_gap.py` | High/low-based bullish and bearish FVG formation and mitigation state | Active |
 | `fvg_lifecycle.py` | Immutable FVG interaction, fill, close-confirmed inversion, IFVG invalidation, and relevance selection | Active analytical engine; not integrated into authority |
+| `ifvg_integration.py` | Adapts completed SetupOverlay IFVG support into one optional, non-required confluence factor | Active non-authoritative adapter |
 | `sessions.py` | New York session windows, session highs/lows, and wick-based sweep detection | Active |
 | `timeframe_roles.py` | Typed direction/setup states and explicit timeframe-role mapping | Active strategy boundary |
 | `decision_authority.py` | Sole status, confidence, gate, next-action, and playbook-phase authority | Authoritative |
@@ -154,10 +155,16 @@ interaction and fill depth. A bullish FVG becomes a bearish IFVG only after a
 close below its bottom; a bearish FVG becomes a bullish IFVG only after a close
 above its top. Wick-only boundary breaks do not confirm inversion.
 
-This engine is analytical infrastructure only. It is not yet called by
-`DecisionAuthority`, `SetupOverlay`, the chart, or `ConfluenceEngine`; the
-current directional active 1M FVG gate remains unchanged. IFVG integration and
-any resulting confluence contribution require separate approval.
+The application evaluates this lifecycle from fixed 1M execution data.
+`SetupOverlay` may project at most one active directional IFVG when it strictly
+overlaps the visible authority-selected 1M FVG. The chart renders that IFVG as
+optional confluence, separately from the authority-required FVG. A thin adapter
+can replace Confluence Engine's IFVG placeholder with a non-required factor;
+Confluence does not inspect candles or calculate inversion.
+
+`DecisionAuthority` does not consume lifecycle or IFVG results. The current
+directional active 1M FVG gate, status, confidence, direction, and phase remain
+unchanged. IFVG cannot substitute for the authority FVG.
 
 ### Order blocks
 
@@ -190,6 +197,6 @@ The future swing-options engine must be a separate strategy system with separate
 - The production symbol is currently hard-coded to `NQ=F`; ES selection is planned.
 - Yahoo availability, history limits, and candle construction can affect results.
 - No true bid/ask order flow is available.
-- IFVG lifecycle analysis exists, but IFVG authority, overlay, chart, and confluence integration are not implemented.
+- IFVG lifecycle, optional overlay, chart, and confluence integration exist; IFVG authority behavior is intentionally not implemented.
 - Volume profile, execution planning, entries, stops, targets, and sizing are not implemented.
 - Stronger 15M thesis-invalidation rules remain undefined.

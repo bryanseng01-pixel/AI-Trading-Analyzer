@@ -51,8 +51,8 @@ Version 1 establishes the current day-trading platform:
 
 ### Planned scope
 
-- Integrate the implemented typed FVG lifecycle states only after validating their isolated analytical output.
-- Add the implemented close-confirmed IFVG lifecycle to overlay, confluence, or authority paths only through separately approved integration slices.
+- Continue validating the implemented typed FVG lifecycle and its optional overlay/confluence projection.
+- Keep close-confirmed IFVG evidence outside authority unless a later, separately approved playbook change defines it as a gate.
 - Approve and integrate order-block formation, validity, mitigation, and invalidation rules.
 - Refine liquidity-pool lifecycle and session selection.
 - Define stronger 15M thesis-reversal and invalidation rules.
