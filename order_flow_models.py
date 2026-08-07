@@ -276,6 +276,8 @@ class AuthorityExecutionLocation:
     top: float
     formation_time: pd.Timestamp
     source: str
+    location_id: str | None = None
+    source_contract: str | None = None
 
     def __post_init__(self) -> None:
         if self.top < self.bottom:
@@ -290,6 +292,7 @@ class ExecutionLocationWindow:
     end_time: pd.Timestamp
     interaction_start_time: pd.Timestamp | None
     interaction_end_time: pd.Timestamp | None
+    authority_observed_at: pd.Timestamp | None = None
 
     def __post_init__(self) -> None:
         _require_time_range(self.start_time, self.end_time)
@@ -297,6 +300,8 @@ class ExecutionLocationWindow:
             _require_aware(self.interaction_start_time, "interaction_start_time")
         if self.interaction_end_time is not None:
             _require_aware(self.interaction_end_time, "interaction_end_time")
+        if self.authority_observed_at is not None:
+            _require_aware(self.authority_observed_at, "authority_observed_at")
 
 
 @dataclass(frozen=True)

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 import pandas as pd
 
@@ -9,6 +9,9 @@ from order_flow_models import (
     OrderFlowAnalysisMetadata,
     OrderFlowWindow,
 )
+
+if TYPE_CHECKING:
+    from delta_engine import DeltaLocationAssessment
 
 
 @dataclass(frozen=True)
@@ -135,7 +138,7 @@ class DeltaEngine(Protocol):
         self,
         window: OrderFlowWindow,
         location_window: ExecutionLocationWindow,
-    ) -> DeltaResult: ...
+    ) -> "DeltaLocationAssessment": ...
 
 
 class CumulativeDeltaEngine(Protocol):
