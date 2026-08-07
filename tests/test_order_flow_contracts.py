@@ -81,21 +81,27 @@ def test_domain_result_contracts_are_independent_and_immutable():
         reset_events=(),
         valid_through=metadata.evaluated_end_time,
     )
-    imbalance = BidAskImbalanceResult(
-        metadata, 12, 7, 2, 12 / 7, None, None, "Rules are not approved."
-    )
     footprint = FootprintResult(
-        metadata,
-        0.25,
-        (FootprintLevel(100, 7, 12, 2, 5, 4),),
-        (),
+        metadata=metadata,
+        location_id="fvg-1",
+        tick_size=0.25,
+        observation_start=metadata.evaluated_start_time,
+        evaluated_through=metadata.evaluated_end_time,
+        core_bottom=100,
+        core_top=106,
+        footprint_bottom=99.75,
+        footprint_top=106.25,
+        levels=(FootprintLevel(400, 100, 7, 12, 2, 5, 4, 19 / 21, True, False),),
+        total_bid_volume=7,
+        total_ask_volume=12,
+        total_unknown_volume=2,
+        classification_coverage=19 / 21,
     )
     absorption = AbsorptionResult(metadata, (), ())
     exhaustion = ExhaustionResult(metadata, (), ())
 
     assert delta.net_delta == 5
     assert cumulative.ending_value == 5
-    assert imbalance.threshold_satisfied is None
     assert footprint.levels[0].delta == 5
     assert absorption.observations == ()
     assert exhaustion.observations == ()
