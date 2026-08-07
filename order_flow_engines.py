@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 from typing import TYPE_CHECKING, Protocol
 
 import pandas as pd
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
     )
     from delta_aggregation import DeltaBucketSeries
     from delta_engine import DeltaLocationAssessment
+    from timeframe_roles import Direction
 
 
 @dataclass(frozen=True)
@@ -62,44 +64,78 @@ class CumulativeDeltaResult:
 
 
 @dataclass(frozen=True)
-class BidAskImbalanceResult:
-    metadata: OrderFlowAnalysisMetadata
-    ask_volume: float
-    bid_volume: float
-    unknown_volume: float
-    ask_bid_ratio: float | None
-    dominant_side: AggressorSide | None
-    threshold_satisfied: bool | None
-    explanation: str
-
-
-@dataclass(frozen=True)
 class FootprintLevel:
+    tick_index: int
     price: float
     bid_volume: float
     ask_volume: float
     unknown_volume: float
     delta: float
     trade_count: int
+    classification_coverage: float
+    inside_authority_zone: bool
+    comparison_only: bool
 
 
 @dataclass(frozen=True)
 class FootprintImbalance:
-    price: float
-    side: AggressorSide
+    subject_tick_index: int
+    subject_price: float
+    comparison_tick_index: int
     comparison_price: float
+    side: AggressorSide
     numerator_volume: float
     denominator_volume: float
     ratio: float | None
+    zero_denominator: bool
     stacked_sequence_id: str | None
 
 
 @dataclass(frozen=True)
 class FootprintResult:
     metadata: OrderFlowAnalysisMetadata
+    location_id: str
     tick_size: float
+    observation_start: pd.Timestamp | None
+    evaluated_through: pd.Timestamp
+    core_bottom: float
+    core_top: float
+    footprint_bottom: float
+    footprint_top: float
     levels: tuple[FootprintLevel, ...]
+    total_bid_volume: float
+    total_ask_volume: float
+    total_unknown_volume: float
+    classification_coverage: float
+
+
+class ImbalanceContext(str, Enum):
+    SUPPORTIVE_AGGRESSION = "supportive_aggression"
+    OPPOSING_AGGRESSION = "opposing_aggression"
+    MIXED = "mixed"
+    NO_STACKED_IMBALANCE = "no_stacked_imbalance"
+    UNAVAILABLE = "unavailable"
+
+
+@dataclass(frozen=True)
+class BidAskImbalanceResult:
+    metadata: OrderFlowAnalysisMetadata
+    location_id: str
+    authority_direction: "Direction"
     imbalances: tuple[FootprintImbalance, ...]
+    ask_stacks: tuple[tuple[FootprintImbalance, ...], ...]
+    bid_stacks: tuple[tuple[FootprintImbalance, ...], ...]
+    context: ImbalanceContext
+    supportive: bool | None
+    explanation: str
+    limitations: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if self.context == ImbalanceContext.UNAVAILABLE:
+            if self.supportive is not None:
+                raise ValueError("Unavailable imbalance cannot claim support.")
+        elif self.supportive is None:
+            raise ValueError("Completed imbalance assessment requires a result.")
 
 
 @dataclass(frozen=True)
@@ -162,8 +198,7 @@ class CumulativeDeltaEngine(Protocol):
 class BidAskImbalanceEngine(Protocol):
     def evaluate(
         self,
-        window: OrderFlowWindow,
-        location_window: ExecutionLocationWindow,
+        footprint: FootprintResult,
     ) -> BidAskImbalanceResult: ...
 
 

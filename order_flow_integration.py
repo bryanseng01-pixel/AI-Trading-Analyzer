@@ -8,8 +8,11 @@ from order_flow_models import OrderFlowAnalysisMetadata
 class OrderFlowFactorKey(str, Enum):
     DELTA_CONFIRMATION = "delta_confirmation"
     CUMULATIVE_DELTA_CONTEXT = "cumulative_delta_context"
-    BID_ASK_IMBALANCE = "bid_ask_imbalance"
-    FOOTPRINT = "footprint"
+    FOOTPRINT_IMBALANCE = "footprint_imbalance"
+    # Compatibility aliases; footprint facts and their imbalance interpretation
+    # now contribute one non-duplicated optional factor.
+    BID_ASK_IMBALANCE = "footprint_imbalance"
+    FOOTPRINT = "footprint_imbalance"
     ABSORPTION = "absorption"
     EXHAUSTION = "exhaustion"
 
