@@ -51,4 +51,5 @@ py-modules = [
     "timeframe_roles",
     "trade_checklist",
     "tradingview_chart",
+    "volume_profile_engine",
 ]
