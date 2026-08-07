@@ -6,6 +6,12 @@ import pandas as pd
 
 from analysis_pipeline import TimeframeAnalysis
 from decision_authority import AuthorityDecision
+from fvg_lifecycle import (
+    FvgLifecycle,
+    FvgLifecycleResult,
+    FvgLifecycleState,
+    ImbalanceKind,
+)
 from timeframe_roles import Direction
 
 
@@ -32,7 +38,18 @@ class OverlayAnnotationKind(str, Enum):
     LIQUIDITY = "liquidity"
     STRUCTURE = "structure"
     EXECUTION_ZONE = "execution_zone"
+    OPTIONAL_CONFLUENCE = "optional_confluence"
     LIMITATION = "limitation"
+
+
+class OverlayZoneKind(str, Enum):
+    ORIGINAL_FVG = "original_fvg"
+    IFVG = "ifvg"
+
+
+class OverlayZonePurpose(str, Enum):
+    AUTHORITY_REQUIRED = "authority_required"
+    OPTIONAL_CONFLUENCE = "optional_confluence"
 
 
 @dataclass(frozen=True)
@@ -59,6 +76,54 @@ class OverlayZone:
     formation_end_time: pd.Timestamp
     source: str
     importance: str | None = None
+    kind: OverlayZoneKind = OverlayZoneKind.ORIGINAL_FVG
+    purpose: OverlayZonePurpose = OverlayZonePurpose.AUTHORITY_REQUIRED
+    inversion_time: pd.Timestamp | None = None
+
+
+@dataclass(frozen=True)
+class IfvgOverlaySupport:
+    """Optional IFVG evidence projected against the authority FVG zone."""
+
+    applicable: bool
+    evaluated: bool
+    supporting_zone: OverlayZone | None
+    overlap_bottom: float | None
+    overlap_top: float | None
+    overlap_percentage: float | None
+    explanation: str
+    limitations: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if self.overlap_percentage is not None and not (
+            0.0 <= self.overlap_percentage <= 1.0
+        ):
+            raise ValueError("overlap_percentage must be between 0.0 and 1.0.")
+        if self.supporting_zone is not None:
+            if not self.applicable or not self.evaluated:
+                raise ValueError("A supporting IFVG must be applicable and evaluated.")
+            if self.supporting_zone.kind != OverlayZoneKind.IFVG:
+                raise ValueError("IFVG support requires an IFVG overlay zone.")
+            if (
+                self.supporting_zone.purpose
+                != OverlayZonePurpose.OPTIONAL_CONFLUENCE
+            ):
+                raise ValueError("IFVG support must remain optional confluence.")
+            if None in {
+                self.overlap_bottom,
+                self.overlap_top,
+                self.overlap_percentage,
+            }:
+                raise ValueError("A supporting IFVG requires overlap geometry.")
+        elif any(
+            value is not None
+            for value in (
+                self.overlap_bottom,
+                self.overlap_top,
+                self.overlap_percentage,
+            )
+        ):
+            raise ValueError("Overlap geometry requires a supporting IFVG.")
 
 
 @dataclass(frozen=True)
@@ -77,6 +142,7 @@ class OverlayVisibility:
     show_confirmation_level: bool
     show_trigger_level: bool
     show_execution_zone: bool
+    show_optional_ifvg_zone: bool
     show_invalidation_level: bool
     show_target_levels: bool
 
@@ -96,6 +162,7 @@ class SetupOverlay:
     confirmation_level_5m: OverlayLevel | None
     trigger_level_1m: OverlayLevel | None
     active_execution_zone: OverlayZone | None
+    ifvg_support: IfvgOverlaySupport
     invalidation_level: OverlayLevel | None
     target_levels: tuple[OverlayLevel, ...]
     annotations: tuple[OverlayAnnotation, ...]
@@ -111,6 +178,9 @@ def build_setup_overlay(
     authority_decision: AuthorityDecision,
     timeframe_analyses: Mapping[str, TimeframeAnalysis],
     session_levels: Mapping[str, dict[str, Any]],
+    *,
+    fvg_lifecycle_result: FvgLifecycleResult | None = None,
+    minimum_ifvg_size: float | None = None,
 ) -> SetupOverlay:
     """Project authoritative setup state into a chart-ready snapshot."""
 
@@ -230,6 +300,19 @@ def build_setup_overlay(
         trigger_level=trigger_level,
         execution_zone=execution_zone,
     )
+    ifvg_support = _build_ifvg_support(
+        status=status,
+        direction=direction,
+        execution_zone=execution_zone,
+        execution_zone_visible=visibility.show_execution_zone,
+        lifecycle_result=fvg_lifecycle_result,
+        minimum_size=minimum_ifvg_size,
+    )
+    limitations.extend(ifvg_support.limitations)
+    visibility = replace(
+        visibility,
+        show_optional_ifvg_zone=(ifvg_support.supporting_zone is not None),
+    )
     annotations = _annotations(
         authority_decision,
         primary_waiting_level=primary_waiting_level,
@@ -237,6 +320,7 @@ def build_setup_overlay(
         confirmation_level=confirmation_level,
         trigger_level=trigger_level,
         execution_zone=execution_zone,
+        ifvg_support=ifvg_support,
         visibility=visibility,
     )
 
@@ -254,6 +338,7 @@ def build_setup_overlay(
         confirmation_level_5m=confirmation_level,
         trigger_level_1m=trigger_level,
         active_execution_zone=execution_zone,
+        ifvg_support=ifvg_support,
         invalidation_level=None,
         target_levels=(),
         annotations=annotations,
@@ -277,6 +362,7 @@ def _avoid_overlay(
         show_confirmation_level=False,
         show_trigger_level=False,
         show_execution_zone=False,
+        show_optional_ifvg_zone=False,
         show_invalidation_level=False,
         show_target_levels=False,
     )
@@ -298,6 +384,9 @@ def _avoid_overlay(
         confirmation_level_5m=None,
         trigger_level_1m=None,
         active_execution_zone=None,
+        ifvg_support=_inactive_ifvg_support(
+            "IFVG confluence is not applicable while authority status is AVOID."
+        ),
         invalidation_level=None,
         target_levels=(),
         annotations=(annotation,),
@@ -481,6 +570,8 @@ def _execution_zone(
         formation_end_time=pd.Timestamp(fvg["end_time"]),
         source="authority_filtered_fvg",
         importance="primary",
+        kind=OverlayZoneKind.ORIGINAL_FVG,
+        purpose=OverlayZonePurpose.AUTHORITY_REQUIRED,
     )
 
 
@@ -517,6 +608,7 @@ def _visibility(
         show_confirmation_level=show_confirmation,
         show_trigger_level=show_trigger,
         show_execution_zone=show_zone,
+        show_optional_ifvg_zone=False,
         show_invalidation_level=False,
         show_target_levels=False,
     )
@@ -530,6 +622,7 @@ def _annotations(
     confirmation_level: OverlayLevel | None,
     trigger_level: OverlayLevel | None,
     execution_zone: OverlayZone | None,
+    ifvg_support: IfvgOverlaySupport,
     visibility: OverlayVisibility,
 ) -> tuple[OverlayAnnotation, ...]:
     direction = decision.roles.context_direction
@@ -583,6 +676,21 @@ def _annotations(
             )
         )
     if (
+        visibility.show_optional_ifvg_zone
+        and ifvg_support.supporting_zone is not None
+    ):
+        zone = ifvg_support.supporting_zone
+        annotations.append(
+            OverlayAnnotation(
+                kind=OverlayAnnotationKind.OPTIONAL_CONFLUENCE,
+                text=(
+                    f"Optional IFVG overlap: {zone.bottom:.2f}–"
+                    f"{zone.top:.2f}"
+                ),
+                zone=zone,
+            )
+        )
+    if (
         visibility.show_primary_waiting_level
         and primary_waiting_level is not None
         and all(item.level is not primary_waiting_level for item in annotations)
@@ -595,3 +703,171 @@ def _annotations(
             )
         )
     return tuple(annotations)
+
+
+def _build_ifvg_support(
+    *,
+    status: str,
+    direction: Direction | None,
+    execution_zone: OverlayZone | None,
+    execution_zone_visible: bool,
+    lifecycle_result: FvgLifecycleResult | None,
+    minimum_size: float | None,
+) -> IfvgOverlaySupport:
+    applicable = (
+        status in {"WATCH", "READY"}
+        and direction is not None
+        and execution_zone is not None
+        and execution_zone_visible
+    )
+    if not applicable:
+        return _inactive_ifvg_support(
+            "IFVG confluence requires a visible authority execution FVG."
+        )
+    if lifecycle_result is None:
+        return IfvgOverlaySupport(
+            applicable=True,
+            evaluated=False,
+            supporting_zone=None,
+            overlap_bottom=None,
+            overlap_top=None,
+            overlap_percentage=None,
+            explanation="IFVG lifecycle data was not supplied.",
+            limitations=("IFVG support cannot be evaluated without 1M lifecycle data.",),
+        )
+    if _normalized_timeframe(lifecycle_result.timeframe) != "1m":
+        return IfvgOverlaySupport(
+            applicable=True,
+            evaluated=False,
+            supporting_zone=None,
+            overlap_bottom=None,
+            overlap_top=None,
+            overlap_percentage=None,
+            explanation="The supplied lifecycle result is not 1M execution data.",
+            limitations=("IFVG support requires a 1M lifecycle result.",),
+        )
+    if minimum_size is None:
+        return IfvgOverlaySupport(
+            applicable=True,
+            evaluated=False,
+            supporting_zone=None,
+            overlap_bottom=None,
+            overlap_top=None,
+            overlap_percentage=None,
+            explanation="The existing FVG size threshold was not supplied.",
+            limitations=("IFVG support requires the existing FVG size threshold.",),
+        )
+
+    candidates = []
+    for zone in lifecycle_result.active_ifvgs:
+        overlap = _ifvg_overlap(execution_zone, zone)
+        if (
+            zone.kind == ImbalanceKind.IFVG
+            and zone.state == FvgLifecycleState.INVERTED
+            and zone.active
+            and zone.current_direction == direction
+            and zone.invalidation_time is None
+            and zone.size >= minimum_size
+            and overlap is not None
+        ):
+            overlap_bottom, overlap_top = overlap
+            overlap_size = overlap_top - overlap_bottom
+            candidates.append(
+                (
+                    zone,
+                    overlap_bottom,
+                    overlap_top,
+                    overlap_size,
+                )
+            )
+
+    if not candidates:
+        return IfvgOverlaySupport(
+            applicable=True,
+            evaluated=True,
+            supporting_zone=None,
+            overlap_bottom=None,
+            overlap_top=None,
+            overlap_percentage=None,
+            explanation=(
+                "No active directional 1M IFVG overlaps the authority execution FVG."
+            ),
+            limitations=tuple(lifecycle_result.limitations),
+        )
+
+    authority_midpoint = (execution_zone.top + execution_zone.bottom) / 2.0
+    selected = min(
+        candidates,
+        key=lambda item: (
+            -item[3],
+            abs(((item[0].top + item[0].bottom) / 2.0) - authority_midpoint),
+            -(item[0].inversion_time.value if item[0].inversion_time else -1),
+            -item[0].formation_time.value,
+            item[0].original_direction.value,
+            item[0].bottom,
+            item[0].top,
+        ),
+    )
+    zone, overlap_bottom, overlap_top, _ = selected
+    overlap_percentage = (
+        (overlap_top - overlap_bottom)
+        / (execution_zone.top - execution_zone.bottom)
+    )
+    inversion_time = zone.inversion_time
+    if inversion_time is None:
+        raise ValueError("An active IFVG must have an inversion timestamp.")
+    overlay_zone = OverlayZone(
+        top=zone.top,
+        bottom=zone.bottom,
+        timeframe="1M",
+        direction=zone.current_direction,
+        label=f"Optional {zone.current_direction.value} 1M IFVG confluence",
+        start_time=inversion_time,
+        formation_end_time=inversion_time,
+        source="fvg_lifecycle",
+        importance="secondary",
+        kind=OverlayZoneKind.IFVG,
+        purpose=OverlayZonePurpose.OPTIONAL_CONFLUENCE,
+        inversion_time=inversion_time,
+    )
+    return IfvgOverlaySupport(
+        applicable=True,
+        evaluated=True,
+        supporting_zone=overlay_zone,
+        overlap_bottom=overlap_bottom,
+        overlap_top=overlap_top,
+        overlap_percentage=overlap_percentage,
+        explanation="An active directional 1M IFVG overlaps the authority FVG.",
+        limitations=tuple(lifecycle_result.limitations),
+    )
+
+
+def _inactive_ifvg_support(explanation: str) -> IfvgOverlaySupport:
+    return IfvgOverlaySupport(
+        applicable=False,
+        evaluated=False,
+        supporting_zone=None,
+        overlap_bottom=None,
+        overlap_top=None,
+        overlap_percentage=None,
+        explanation=explanation,
+        limitations=(),
+    )
+
+
+def _ifvg_overlap(
+    execution_zone: OverlayZone,
+    ifvg: FvgLifecycle,
+) -> tuple[float, float] | None:
+    overlap_bottom = max(execution_zone.bottom, ifvg.bottom)
+    overlap_top = min(execution_zone.top, ifvg.top)
+    if overlap_top <= overlap_bottom:
+        return None
+    return overlap_bottom, overlap_top
+
+
+def _normalized_timeframe(timeframe: str) -> str:
+    normalized = timeframe.strip().lower().replace(" ", "")
+    if normalized in {"1m", "1min", "1minute"}:
+        return "1m"
+    return normalized
