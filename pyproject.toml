@@ -41,6 +41,8 @@ py-modules = [
     "liquidity",
     "market_structure",
     "order_blocks",
+    "order_block_engine",
+    "order_block_integration",
     "sessions",
     "setup_overlay",
     "structure",

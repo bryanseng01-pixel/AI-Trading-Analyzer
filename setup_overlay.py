@@ -12,6 +12,10 @@ from fvg_lifecycle import (
     FvgLifecycleState,
     ImbalanceKind,
 )
+from order_block_engine import (
+    OrderBlockResult,
+    select_relevant_order_block,
+)
 from timeframe_roles import Direction
 
 
@@ -45,6 +49,7 @@ class OverlayAnnotationKind(str, Enum):
 class OverlayZoneKind(str, Enum):
     ORIGINAL_FVG = "original_fvg"
     IFVG = "ifvg"
+    ORDER_BLOCK = "order_block"
 
 
 class OverlayZonePurpose(str, Enum):
@@ -127,6 +132,53 @@ class IfvgOverlaySupport:
 
 
 @dataclass(frozen=True)
+class OrderBlockOverlaySupport:
+    """Optional Order Block evidence projected against the authority FVG."""
+
+    applicable: bool
+    evaluated: bool
+    supporting_zone: OverlayZone | None
+    overlap_bottom: float | None
+    overlap_top: float | None
+    overlap_percentage: float | None
+    explanation: str
+    limitations: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if self.overlap_percentage is not None and not (
+            0.0 <= self.overlap_percentage <= 1.0
+        ):
+            raise ValueError("overlap_percentage must be between 0.0 and 1.0.")
+        if self.supporting_zone is not None:
+            if not self.applicable or not self.evaluated:
+                raise ValueError(
+                    "A supporting Order Block must be applicable and evaluated."
+                )
+            if self.supporting_zone.kind != OverlayZoneKind.ORDER_BLOCK:
+                raise ValueError("Order Block support requires an Order Block zone.")
+            if (
+                self.supporting_zone.purpose
+                != OverlayZonePurpose.OPTIONAL_CONFLUENCE
+            ):
+                raise ValueError("Order Block support must remain optional.")
+            if None in {
+                self.overlap_bottom,
+                self.overlap_top,
+                self.overlap_percentage,
+            }:
+                raise ValueError("Order Block support requires overlap geometry.")
+        elif any(
+            value is not None
+            for value in (
+                self.overlap_bottom,
+                self.overlap_top,
+                self.overlap_percentage,
+            )
+        ):
+            raise ValueError("Overlap geometry requires a supporting Order Block.")
+
+
+@dataclass(frozen=True)
 class OverlayAnnotation:
     kind: OverlayAnnotationKind
     text: str
@@ -143,6 +195,7 @@ class OverlayVisibility:
     show_trigger_level: bool
     show_execution_zone: bool
     show_optional_ifvg_zone: bool
+    show_optional_order_block_zone: bool
     show_invalidation_level: bool
     show_target_levels: bool
 
@@ -163,6 +216,7 @@ class SetupOverlay:
     trigger_level_1m: OverlayLevel | None
     active_execution_zone: OverlayZone | None
     ifvg_support: IfvgOverlaySupport
+    order_block_support: OrderBlockOverlaySupport
     invalidation_level: OverlayLevel | None
     target_levels: tuple[OverlayLevel, ...]
     annotations: tuple[OverlayAnnotation, ...]
@@ -181,6 +235,7 @@ def build_setup_overlay(
     *,
     fvg_lifecycle_result: FvgLifecycleResult | None = None,
     minimum_ifvg_size: float | None = None,
+    order_block_result: OrderBlockResult | None = None,
 ) -> SetupOverlay:
     """Project authoritative setup state into a chart-ready snapshot."""
 
@@ -313,6 +368,20 @@ def build_setup_overlay(
         visibility,
         show_optional_ifvg_zone=(ifvg_support.supporting_zone is not None),
     )
+    order_block_support = _build_order_block_support(
+        status=status,
+        direction=direction,
+        execution_zone=execution_zone,
+        execution_zone_visible=visibility.show_execution_zone,
+        result=order_block_result,
+    )
+    limitations.extend(order_block_support.limitations)
+    visibility = replace(
+        visibility,
+        show_optional_order_block_zone=(
+            order_block_support.supporting_zone is not None
+        ),
+    )
     annotations = _annotations(
         authority_decision,
         primary_waiting_level=primary_waiting_level,
@@ -321,6 +390,7 @@ def build_setup_overlay(
         trigger_level=trigger_level,
         execution_zone=execution_zone,
         ifvg_support=ifvg_support,
+        order_block_support=order_block_support,
         visibility=visibility,
     )
 
@@ -339,6 +409,7 @@ def build_setup_overlay(
         trigger_level_1m=trigger_level,
         active_execution_zone=execution_zone,
         ifvg_support=ifvg_support,
+        order_block_support=order_block_support,
         invalidation_level=None,
         target_levels=(),
         annotations=annotations,
@@ -363,6 +434,7 @@ def _avoid_overlay(
         show_trigger_level=False,
         show_execution_zone=False,
         show_optional_ifvg_zone=False,
+        show_optional_order_block_zone=False,
         show_invalidation_level=False,
         show_target_levels=False,
     )
@@ -386,6 +458,9 @@ def _avoid_overlay(
         active_execution_zone=None,
         ifvg_support=_inactive_ifvg_support(
             "IFVG confluence is not applicable while authority status is AVOID."
+        ),
+        order_block_support=_inactive_order_block_support(
+            "Order Block confluence is not applicable while authority status is AVOID."
         ),
         invalidation_level=None,
         target_levels=(),
@@ -609,6 +684,7 @@ def _visibility(
         show_trigger_level=show_trigger,
         show_execution_zone=show_zone,
         show_optional_ifvg_zone=False,
+        show_optional_order_block_zone=False,
         show_invalidation_level=False,
         show_target_levels=False,
     )
@@ -623,6 +699,7 @@ def _annotations(
     trigger_level: OverlayLevel | None,
     execution_zone: OverlayZone | None,
     ifvg_support: IfvgOverlaySupport,
+    order_block_support: OrderBlockOverlaySupport,
     visibility: OverlayVisibility,
 ) -> tuple[OverlayAnnotation, ...]:
     direction = decision.roles.context_direction
@@ -654,6 +731,21 @@ def _annotations(
                 kind=OverlayAnnotationKind.STRUCTURE,
                 text=confirmation_level.label,
                 level=confirmation_level,
+            )
+        )
+    if (
+        visibility.show_optional_order_block_zone
+        and order_block_support.supporting_zone is not None
+    ):
+        zone = order_block_support.supporting_zone
+        annotations.append(
+            OverlayAnnotation(
+                kind=OverlayAnnotationKind.OPTIONAL_CONFLUENCE,
+                text=(
+                    f"Optional Order Block overlap: {zone.bottom:.2f}–"
+                    f"{zone.top:.2f}"
+                ),
+                zone=zone,
             )
         )
     if visibility.show_trigger_level and trigger_level is not None:
@@ -871,3 +963,112 @@ def _normalized_timeframe(timeframe: str) -> str:
     if normalized in {"1m", "1min", "1minute"}:
         return "1m"
     return normalized
+
+
+def _build_order_block_support(
+    *,
+    status: str,
+    direction: Direction | None,
+    execution_zone: OverlayZone | None,
+    execution_zone_visible: bool,
+    result: OrderBlockResult | None,
+) -> OrderBlockOverlaySupport:
+    applicable = (
+        status in {"WATCH", "READY"}
+        and direction is not None
+        and execution_zone is not None
+        and execution_zone_visible
+    )
+    if not applicable:
+        return _inactive_order_block_support(
+            "Order Block confluence requires a visible authority execution FVG."
+        )
+    if result is None:
+        return OrderBlockOverlaySupport(
+            applicable=True,
+            evaluated=False,
+            supporting_zone=None,
+            overlap_bottom=None,
+            overlap_top=None,
+            overlap_percentage=None,
+            explanation="Order Block analysis was not supplied.",
+            limitations=(
+                "Order Block support cannot be evaluated without a 1M result.",
+            ),
+        )
+    if _normalized_timeframe(result.timeframe) != "1m":
+        return OrderBlockOverlaySupport(
+            applicable=True,
+            evaluated=False,
+            supporting_zone=None,
+            overlap_bottom=None,
+            overlap_top=None,
+            overlap_percentage=None,
+            explanation="The supplied Order Block result is not 1M execution data.",
+            limitations=("Order Block support requires a 1M result.",),
+        )
+
+    selected = select_relevant_order_block(
+        result,
+        direction=direction,
+        authority_zone_bottom=execution_zone.bottom,
+        authority_zone_top=execution_zone.top,
+    )
+    if selected is None:
+        return OrderBlockOverlaySupport(
+            applicable=True,
+            evaluated=True,
+            supporting_zone=None,
+            overlap_bottom=None,
+            overlap_top=None,
+            overlap_percentage=None,
+            explanation=(
+                "No active directional 1M Order Block overlaps the authority FVG."
+            ),
+            limitations=result.limitations,
+        )
+
+    overlap_bottom = max(execution_zone.bottom, selected.bottom)
+    overlap_top = min(execution_zone.top, selected.top)
+    overlap_percentage = (
+        (overlap_top - overlap_bottom)
+        / (execution_zone.top - execution_zone.bottom)
+    )
+    zone = OverlayZone(
+        top=selected.top,
+        bottom=selected.bottom,
+        timeframe="1M",
+        direction=selected.direction,
+        label=f"Optional {selected.direction.value} 1M Order Block confluence",
+        start_time=selected.formation_time,
+        formation_end_time=selected.formation_time,
+        source="order_block_engine",
+        importance="secondary",
+        kind=OverlayZoneKind.ORDER_BLOCK,
+        purpose=OverlayZonePurpose.OPTIONAL_CONFLUENCE,
+    )
+    return OrderBlockOverlaySupport(
+        applicable=True,
+        evaluated=True,
+        supporting_zone=zone,
+        overlap_bottom=overlap_bottom,
+        overlap_top=overlap_top,
+        overlap_percentage=overlap_percentage,
+        explanation="An active directional 1M Order Block overlaps the authority FVG.",
+        limitations=result.limitations,
+    )
+
+
+def _inactive_order_block_support(
+    explanation: str,
+) -> OrderBlockOverlaySupport:
+    return OrderBlockOverlaySupport(
+        applicable=False,
+        evaluated=False,
+        supporting_zone=None,
+        overlap_bottom=None,
+        overlap_top=None,
+        overlap_percentage=None,
+        explanation=explanation,
+        limitations=(),
+    )

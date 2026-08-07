@@ -489,6 +489,33 @@ def display_tradingview_chart(
                         }}
                     ]);
                 }}
+
+                if (setupOverlayData.optional_order_block_zone !== null) {{
+                    const zone = setupOverlayData.optional_order_block_zone;
+                    const orderBlockSeries = chart.addSeries(
+                        LightweightCharts.BaselineSeries,
+                        {{
+                            baseValue: {{ type: "price", price: zone.bottom }},
+                            topFillColor1: "rgba(245, 158, 11, 0.03)",
+                            topFillColor2: "rgba(245, 158, 11, 0.03)",
+                            bottomFillColor1: "rgba(245, 158, 11, 0.03)",
+                            bottomFillColor2: "rgba(245, 158, 11, 0.03)",
+                            topLineColor: "#f59e0b",
+                            bottomLineColor: "#f59e0b",
+                            lineStyle: LightweightCharts.LineStyle.Dotted,
+                            lineWidth: 2,
+                            priceLineVisible: false,
+                            lastValueVisible: false
+                        }}
+                    );
+                    orderBlockSeries.setData([
+                        {{ time: zone.start_time, value: zone.top }},
+                        {{
+                            time: candleData[candleData.length - 1].time,
+                            value: zone.top
+                        }}
+                    ]);
+                }}
             }}
 
             chart.timeScale().fitContent();
@@ -610,6 +637,24 @@ def _serialize_setup_overlay(
             ),
         }
 
+    optional_order_block_zone = None
+    zone = overlay.order_block_support.supporting_zone
+    if visibility.show_optional_order_block_zone and zone is not None:
+        optional_order_block_zone = {
+            "top": zone.top,
+            "bottom": zone.bottom,
+            "timeframe": zone.timeframe,
+            "direction": zone.direction.value,
+            "label": zone.label,
+            "start_time": int(zone.start_time.timestamp()),
+            "formation_end_time": int(zone.formation_end_time.timestamp()),
+            "source": zone.source,
+            "importance": zone.importance,
+            "kind": zone.kind.value,
+            "purpose": zone.purpose.value,
+            "inversion_time": None,
+        }
+
     return {
         "active_playbook": overlay.active_playbook,
         "authority_status": overlay.authority_status,
@@ -622,6 +667,7 @@ def _serialize_setup_overlay(
         "levels": levels,
         "execution_zone": execution_zone,
         "optional_ifvg_zone": optional_ifvg_zone,
+        "optional_order_block_zone": optional_order_block_zone,
         "annotations": [annotation.text for annotation in overlay.annotations],
         "limitations": list(overlay.limitations),
     }

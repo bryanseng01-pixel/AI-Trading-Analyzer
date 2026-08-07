@@ -12,6 +12,8 @@ from decision_authority import DecisionAuthority
 from fvg_lifecycle import evaluate_fvg_lifecycles
 from ifvg_integration import build_ifvg_confluence_factor
 from market_structure import interpret_bias_and_structure
+from order_block_engine import evaluate_order_blocks
+from order_block_integration import build_order_block_confluence_factor
 from sessions import detect_session_levels
 from setup_overlay import build_setup_overlay
 from tradingview_chart import display_tradingview_chart
@@ -98,18 +100,33 @@ fvg_lifecycle_result = evaluate_fvg_lifecycles(
     execution_analysis.fvgs,
     timeframe="1m",
 )
+structure_events = tuple(
+    event
+    for event in (execution_analysis.bos, execution_analysis.choch)
+    if event is not None
+)
+order_block_result = evaluate_order_blocks(
+    execution_analysis.data,
+    structure_events,
+    timeframe="1m",
+)
 setup_overlay = build_setup_overlay(
     authority_decision,
     timeframe_analyses,
     session_levels,
     fvg_lifecycle_result=fvg_lifecycle_result,
     minimum_ifvg_size=minimum_fvg_size,
+    order_block_result=order_block_result,
 )
 ifvg_confluence_factor = build_ifvg_confluence_factor(setup_overlay)
+order_block_confluence_factor = build_order_block_confluence_factor(setup_overlay)
 confluence_result = evaluate_confluence(
     authority_decision,
     setup_overlay,
-    contributed_factors=(ifvg_confluence_factor,),
+    contributed_factors=(
+        ifvg_confluence_factor,
+        order_block_confluence_factor,
+    ),
 )
 trade_plan = authority_decision.trade_plan
 playbook = authority_decision.playbook
