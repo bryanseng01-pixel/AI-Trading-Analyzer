@@ -1,7 +1,11 @@
 from dataclasses import replace
 
 from analysis_pipeline import analyze_timeframe
-from decision_authority import DecisionAuthority
+from dataclasses import FrozenInstanceError
+
+import pytest
+
+from decision_authority import AuthorityGateKey, DecisionAuthority
 from timeframe_roles import Direction, SetupState
 
 
@@ -145,6 +149,32 @@ def test_actual_5m_and_1m_structural_events_enable_ready_state(ohlc_factory):
     assert result.roles.confirmation_direction == Direction.BULLISH
     assert result.roles.trigger_direction == Direction.BULLISH
     assert result.recommendation == "READY"
+
+
+def test_authority_exposes_one_immutable_snapshot_of_approved_gates(
+    ohlc_factory,
+):
+    result = _evaluate(
+        _analyses(ohlc_factory, trigger=False, execution_fvg=False),
+        _session_sweep("bullish"),
+    )
+
+    assert tuple(gate.key for gate in result.gates) == (
+        AuthorityGateKey.HTF_CONTEXT,
+        AuthorityGateKey.SETUP_15M,
+        AuthorityGateKey.LIQUIDITY_SWEEP,
+        AuthorityGateKey.CONFIRMATION_5M,
+        AuthorityGateKey.TRIGGER_1M,
+        AuthorityGateKey.DIRECTIONAL_FVG_1M,
+    )
+    assert [gate.explanation for gate in result.gates if gate.satisfied] == (
+        result.trade_plan["reasons"]
+    )
+    assert [gate.explanation for gate in result.gates if not gate.satisfied] == (
+        result.trade_plan["missing"]
+    )
+    with pytest.raises(FrozenInstanceError):
+        result.gates[0].satisfied = False
 
 
 def test_conflicting_4h_and_1h_context_prevents_candidate(ohlc_factory):

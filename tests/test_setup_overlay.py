@@ -95,8 +95,8 @@ def test_progress_is_a_direct_projection_of_authority_gates(ohlc_factory):
 
     overlay = build_setup_overlay(decision, analyses, sessions)
 
-    expected_complete = len(decision.trade_plan["reasons"])
-    expected_total = expected_complete + len(decision.trade_plan["missing"])
+    expected_complete = sum(gate.satisfied for gate in decision.gates)
+    expected_total = len(decision.gates)
     assert overlay.progress_step == expected_complete
     assert overlay.total_steps == expected_total
     assert overlay.completion_percentage == (

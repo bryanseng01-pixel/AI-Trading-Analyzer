@@ -122,10 +122,8 @@ def build_setup_overlay(
         "Targets await approved Trade Planner rules.",
     ]
 
-    confirmed_gates = authority_decision.trade_plan["reasons"]
-    missing_gates = authority_decision.trade_plan["missing"]
-    progress_step = len(confirmed_gates)
-    total_steps = progress_step + len(missing_gates)
+    progress_step = sum(gate.satisfied for gate in authority_decision.gates)
+    total_steps = len(authority_decision.gates)
     completion_percentage = (
         progress_step / total_steps * 100.0 if total_steps else 0.0
     )

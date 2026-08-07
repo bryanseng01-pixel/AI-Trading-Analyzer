@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Mapping
 
 from analysis_pipeline import TimeframeAnalysis, select_active_fvgs
@@ -10,12 +11,31 @@ from timeframe_roles import (
 )
 
 
+class AuthorityGateKey(str, Enum):
+    HTF_CONTEXT = "htf_context"
+    LIQUIDITY_SWEEP = "liquidity_sweep"
+    SETUP_15M = "setup_15m"
+    CONFIRMATION_5M = "confirmation_5m"
+    TRIGGER_1M = "trigger_1m"
+    DIRECTIONAL_FVG_1M = "directional_fvg_1m"
+
+
+@dataclass(frozen=True)
+class AuthorityGate:
+    """One immutable gate result calculated by DecisionAuthority."""
+
+    key: AuthorityGateKey
+    satisfied: bool
+    explanation: str
+
+
 @dataclass(frozen=True)
 class AuthorityDecision:
     """The one final recommendation exposed by the application."""
 
     recommendation: str
     roles: TimeframeRoleState
+    gates: tuple[AuthorityGate, ...]
     active_fvgs: list[dict[str, Any]]
     trade_plan: dict[str, Any]
     playbook: dict[str, Any]
@@ -49,24 +69,26 @@ class DecisionAuthority:
             direction,
             session_levels,
         )
-
-        status = _recommendation_status(
+        gates = _build_authority_gates(
             roles,
             liquidity_swept=liquidity_swept,
             execution_fvg_available=bool(directional_fvgs),
         )
+
+        status = _recommendation_status(
+            roles,
+            gates=gates,
+        )
         trade_plan = _build_trade_plan_view(
             roles,
             status=status,
-            liquidity_swept=liquidity_swept,
-            execution_fvg_available=bool(directional_fvgs),
+            gates=gates,
             session_levels=session_levels,
         )
         playbook = _build_playbook_view(
             roles,
             status=status,
-            liquidity_swept=liquidity_swept,
-            execution_fvg_available=bool(directional_fvgs),
+            gates=gates,
             reasons=trade_plan["reasons"],
             missing=trade_plan["missing"],
         )
@@ -74,6 +96,7 @@ class DecisionAuthority:
         return AuthorityDecision(
             recommendation=status,
             roles=roles,
+            gates=gates,
             active_fvgs=active_fvgs,
             trade_plan=trade_plan,
             playbook=playbook,
@@ -100,78 +123,110 @@ def _relevant_liquidity_swept(
 def _recommendation_status(
     roles: TimeframeRoleState,
     *,
-    liquidity_swept: bool,
-    execution_fvg_available: bool,
+    gates: tuple[AuthorityGate, ...],
 ) -> str:
-    if roles.context_direction is None:
+    gate = {item.key: item.satisfied for item in gates}
+    if not gate[AuthorityGateKey.HTF_CONTEXT]:
         return "AVOID"
-    if roles.setup_state == SetupState.UNCONFIRMED:
+    if not gate[AuthorityGateKey.SETUP_15M]:
         return "WAIT"
-    if not liquidity_swept:
+    if not gate[AuthorityGateKey.LIQUIDITY_SWEEP]:
         return "WAIT"
     if (
         roles.setup_state == SetupState.COUNTERTREND_PULLBACK
-        and not roles.confirmation_aligned
+        and not gate[AuthorityGateKey.CONFIRMATION_5M]
     ):
         return "WAIT"
-    if not roles.confirmation_aligned:
+    if not gate[AuthorityGateKey.CONFIRMATION_5M]:
         return "WATCH"
-    if not roles.trigger_aligned or not execution_fvg_available:
+    if (
+        not gate[AuthorityGateKey.TRIGGER_1M]
+        or not gate[AuthorityGateKey.DIRECTIONAL_FVG_1M]
+    ):
         return "WATCH"
     return "READY"
+
+
+def _build_authority_gates(
+    roles: TimeframeRoleState,
+    *,
+    liquidity_swept: bool,
+    execution_fvg_available: bool,
+) -> tuple[AuthorityGate, ...]:
+    context = roles.context_direction is not None
+    setup = roles.setup_state != SetupState.UNCONFIRMED
+    return (
+        AuthorityGate(
+            AuthorityGateKey.HTF_CONTEXT,
+            context,
+            (
+                f"The 4H and 1H context is aligned {roles.context_direction.value}."
+                if context
+                else "Aligned 4H and 1H context"
+            ),
+        ),
+        AuthorityGate(
+            AuthorityGateKey.SETUP_15M,
+            setup,
+            (
+                "The 15M setup supports continuation."
+                if roles.setup_state == SetupState.ALIGNED_CONTINUATION
+                else "The 15M setup is a countertrend pullback."
+                if roles.setup_state == SetupState.COUNTERTREND_PULLBACK
+                else "Reliable 15M setup structure"
+            ),
+        ),
+        AuthorityGate(
+            AuthorityGateKey.LIQUIDITY_SWEEP,
+            liquidity_swept,
+            (
+                "Relevant session liquidity has been swept by a wick."
+                if liquidity_swept
+                else "Relevant session liquidity sweep"
+            ),
+        ),
+        AuthorityGate(
+            AuthorityGateKey.CONFIRMATION_5M,
+            roles.confirmation_aligned,
+            (
+                "A close-confirmed 5M BOS/CHoCH aligns with context."
+                if roles.confirmation_aligned
+                else "Aligned close-confirmed 5M BOS/CHoCH"
+            ),
+        ),
+        AuthorityGate(
+            AuthorityGateKey.TRIGGER_1M,
+            roles.trigger_aligned,
+            (
+                "A close-confirmed 1M BOS/CHoCH trigger aligns."
+                if roles.trigger_aligned
+                else "Aligned close-confirmed 1M BOS/CHoCH"
+            ),
+        ),
+        AuthorityGate(
+            AuthorityGateKey.DIRECTIONAL_FVG_1M,
+            execution_fvg_available,
+            (
+                "A directional active 1M FVG is available."
+                if execution_fvg_available
+                else "Directional active 1M FVG"
+            ),
+        ),
+    )
 
 
 def _build_trade_plan_view(
     roles: TimeframeRoleState,
     *,
     status: str,
-    liquidity_swept: bool,
-    execution_fvg_available: bool,
+    gates: tuple[AuthorityGate, ...],
     session_levels: Mapping[str, dict[str, Any]],
 ) -> dict[str, Any]:
-    reasons: list[str] = []
-    missing: list[str] = []
+    reasons = [gate.explanation for gate in gates if gate.satisfied]
+    missing = [gate.explanation for gate in gates if not gate.satisfied]
     direction = roles.context_direction
 
-    if direction is None:
-        missing.append("Aligned 4H and 1H context")
-    else:
-        reasons.append(
-            f"The 4H and 1H context is aligned {direction.value}."
-        )
-
-    if roles.setup_state == SetupState.ALIGNED_CONTINUATION:
-        reasons.append("The 15M setup supports continuation.")
-    elif roles.setup_state == SetupState.COUNTERTREND_PULLBACK:
-        reasons.append("The 15M setup is a countertrend pullback.")
-    else:
-        missing.append("Reliable 15M setup structure")
-
-    if liquidity_swept:
-        reasons.append("Relevant session liquidity has been swept by a wick.")
-    else:
-        missing.append("Relevant session liquidity sweep")
-
-    if roles.confirmation_aligned:
-        reasons.append("A close-confirmed 5M BOS/CHoCH aligns with context.")
-    else:
-        missing.append("Aligned close-confirmed 5M BOS/CHoCH")
-
-    if roles.trigger_aligned:
-        reasons.append("A close-confirmed 1M BOS/CHoCH trigger aligns.")
-    else:
-        missing.append("Aligned close-confirmed 1M BOS/CHoCH")
-
-    if execution_fvg_available:
-        reasons.append("A directional active 1M FVG is available.")
-    else:
-        missing.append("Directional active 1M FVG")
-
-    confidence = _gate_confidence(
-        roles,
-        liquidity_swept=liquidity_swept,
-        execution_fvg_available=execution_fvg_available,
-    )
+    confidence = _gate_confidence(gates)
     bias = direction.value.title() if direction is not None else "Neutral / Conflicting"
     bullish_points = confidence if direction == Direction.BULLISH else 0
     bearish_points = confidence if direction == Direction.BEARISH else 0
@@ -207,24 +262,22 @@ def _build_trade_plan_view(
 
 
 def _gate_confidence(
-    roles: TimeframeRoleState,
-    *,
-    liquidity_swept: bool,
-    execution_fvg_available: bool,
+    gates: tuple[AuthorityGate, ...],
 ) -> int:
-    if roles.context_direction is None:
+    gate = {item.key: item.satisfied for item in gates}
+    if not gate[AuthorityGateKey.HTF_CONTEXT]:
         return 0
 
     score = 20
-    if roles.setup_state != SetupState.UNCONFIRMED:
+    if gate[AuthorityGateKey.SETUP_15M]:
         score += 20
-    if liquidity_swept:
+    if gate[AuthorityGateKey.LIQUIDITY_SWEEP]:
         score += 20
-    if roles.confirmation_aligned:
+    if gate[AuthorityGateKey.CONFIRMATION_5M]:
         score += 15
-    if roles.trigger_aligned:
+    if gate[AuthorityGateKey.TRIGGER_1M]:
         score += 15
-    if execution_fvg_available:
+    if gate[AuthorityGateKey.DIRECTIONAL_FVG_1M]:
         score += 10
     return score
 
@@ -233,27 +286,27 @@ def _build_playbook_view(
     roles: TimeframeRoleState,
     *,
     status: str,
-    liquidity_swept: bool,
-    execution_fvg_available: bool,
+    gates: tuple[AuthorityGate, ...],
     reasons: list[str],
     missing: list[str],
 ) -> dict[str, Any]:
-    if roles.context_direction is None:
+    gate = {item.key: item.satisfied for item in gates}
+    if not gate[AuthorityGateKey.HTF_CONTEXT]:
         phase = "waiting_for_context"
         next_event = "Wait for 4H and 1H directional alignment."
-    elif roles.setup_state == SetupState.UNCONFIRMED:
+    elif not gate[AuthorityGateKey.SETUP_15M]:
         phase = "waiting_for_setup"
         next_event = "Wait for reliable 15M structural setup evidence."
-    elif not liquidity_swept:
+    elif not gate[AuthorityGateKey.LIQUIDITY_SWEEP]:
         phase = "waiting_for_liquidity"
         next_event = "Wait for the relevant session liquidity to be swept."
-    elif not roles.confirmation_aligned:
+    elif not gate[AuthorityGateKey.CONFIRMATION_5M]:
         phase = "waiting_for_mss"
         next_event = "Wait for a close-confirmed 5M BOS or CHoCH."
-    elif not roles.trigger_aligned:
+    elif not gate[AuthorityGateKey.TRIGGER_1M]:
         phase = "waiting_for_trigger"
         next_event = "Wait for a close-confirmed 1M BOS or CHoCH."
-    elif not execution_fvg_available:
+    elif not gate[AuthorityGateKey.DIRECTIONAL_FVG_1M]:
         phase = "waiting_for_execution_zone"
         next_event = "Wait for a directional active 1M FVG."
     else:
