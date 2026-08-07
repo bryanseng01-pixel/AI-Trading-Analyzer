@@ -178,7 +178,10 @@ def build_trading_workstation_view(
             missing_gates=tuple(
                 item.explanation for item in decision.gates if not item.satisfied
             ),
-            market_story=tuple(build_authority_market_story(decision.roles)),
+            market_story=(
+                *build_authority_market_story(decision.roles),
+                _optional_evidence_story(optional),
+            ),
         ),
         current_setup=CurrentSetupView(
             stage=decision.playbook["phase"],
@@ -203,6 +206,21 @@ def _data_state(bundle: InstrumentAnalysisBundle) -> str:
     if available:
         return "Degraded"
     return "Unavailable"
+
+
+def _optional_evidence_story(optional: tuple[EvidenceItemView, ...]) -> str:
+    supporting = tuple(item.name for item in optional if item.active and item.satisfied)
+    not_supporting = tuple(
+        item.name for item in optional if item.active and item.satisfied is False
+    )
+    if not supporting and not not_supporting:
+        return "Optional location evidence is not currently applicable."
+    parts = []
+    if supporting:
+        parts.append("supporting: " + ", ".join(supporting))
+    if not_supporting:
+        parts.append("not supporting: " + ", ".join(not_supporting))
+    return "Optional location evidence — " + "; ".join(parts) + "."
 
 
 def _timeline(bundle: InstrumentAnalysisBundle) -> tuple[TimelineItemView, ...]:

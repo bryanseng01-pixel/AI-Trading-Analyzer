@@ -68,7 +68,7 @@ No other current dashboard component is permitted to publish an independent reco
 
 ### 6. Dashboard
 
-`app.py` selects an instrument from registry-derived options, loads all five instrument-keyed frames, and renders the completed instrument bundle. `dashboard.py` renders the primary authority summary and setup progress. `tradingview_chart.py` renders the selected timeframe using TradingView Lightweight Charts.
+`app.py` selects an instrument from registry-derived options, loads all five instrument-keyed frames, and renders the completed instrument bundle. `workstation_view.py` projects that bundle into an immutable `TradingWorkstationView`; this presentation boundary formats completed authority, overlay, Confluence, timeline, inspector, and provenance facts without performing trading analysis. `dashboard.py` renders the professional workstation top bar, authoritative summary, Current Setup card, chart workspace, execution-zone inspector, setup timeline, evidence panels, and collapsed diagnostics. `tradingview_chart.py` renders the selected timeframe using TradingView Lightweight Charts.
 
 The main page shows authority outputs, the selected chart, authority-gate progress, and 1M execution FVG context. Technical, session, and legacy information is presented as non-authoritative diagnostics.
 
@@ -79,6 +79,8 @@ The main page shows authority outputs, the selected chart, authority-gate progre
 | `app.py` | Streamlit composition, controls, data orchestration, layout, and diagnostic grouping | Active composition root |
 | `instruments.py` | Extensible immutable instrument registry, Yahoo mapping, shared strategy defaults, and qualified location identities | Active instrument boundary |
 | `instrument_pipeline.py` | Builds and validates one strategy-wide `InstrumentAnalysisBundle` | Active orchestration boundary |
+| `workstation_view.py` | Builds completed presentation-only workstation data from an instrument bundle | Active presentation boundary; non-authoritative |
+| `dashboard.py` | Renders the workstation using completed presentation and domain results only | Active UI boundary; non-authoritative |
 | `data.py` | Yahoo download, Streamlit caching, history selection, column normalization, and 4H resampling | Active data boundary |
 | `analysis_pipeline.py` | Builds complete independent `TimeframeAnalysis` objects and filters active FVGs | Active analysis boundary |
 | `indicators.py` | EMA calculation and EMA-relative trend label | Active; context input only |

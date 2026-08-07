@@ -27,6 +27,7 @@ def test_view_is_completed_presentation_data_from_one_bundle(ohlc_factory):
     assert view.current_setup.waiting_event == bundle.authority_decision.playbook["next_event"]
     assert view.current_setup.next_milestone == bundle.authority_decision.trade_plan["next_action"]
     assert len(view.required_gates) == 6
+    assert view.authority.market_story[-1].startswith("Optional location evidence")
     assert not hasattr(view, "recommendation")
 
 
