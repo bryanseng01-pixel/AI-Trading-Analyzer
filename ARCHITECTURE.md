@@ -92,6 +92,10 @@ The main page shows authority outputs, the selected chart, authority-gate progre
 | `order_blocks.py` | Basic order-block detector | Retained, currently unused |
 | `order_block_engine.py` | Typed structural Order Block formation, qualified displacement, lifecycle, and deterministic overlap selection | Active analytical engine; non-authoritative |
 | `order_block_integration.py` | Adapts completed Order Block overlay support into one optional, non-required confluence factor | Active non-authoritative adapter |
+| `order_flow_models.py` | Immutable provider identity, futures contract, provenance, normalized event, execution-location, and analytical metadata contracts | Active architecture boundary; no analysis rules |
+| `order_flow_provider.py` | Vendor-neutral historical/live provider protocols, explicit-contract resolution boundary, and OHLCV-only source rejection | Active provider boundary; no vendor selected |
+| `order_flow_engines.py` | Typed result models and independent protocols for Delta, Cumulative Delta, Bid/Ask Imbalance, Footprint, Absorption, and Exhaustion | Contract only; analytical rules deferred |
+| `order_flow_integration.py` | Adapts a future approved completed order-flow assessment into one optional confluence factor without interpreting data | Active non-authoritative adapter |
 | `premium_discount_engine.py` | Builds one latest completed directional 15M swing-leg range and classifies the authority FVG | Active analytical engine; non-authoritative |
 | `premium_discount_integration.py` | Adapts completed Premium/Discount classification into one optional, non-required confluence factor | Active non-authoritative adapter |
 | `volume_profile_engine.py` | Builds one previous completed New York session bar-distributed volume-at-price approximation and assesses only the authority FVG | Active analytical engine; non-authoritative |
@@ -221,7 +225,29 @@ DecisionAuthority status, confidence, direction, phase, or gates.
 
 ### Order-flow provider
 
-An order-flow provider interface should isolate vendor-specific transport and normalize true bid/ask trades, delta, imbalance, and related metadata. It must expose availability and data quality explicitly. Yahoo Finance cannot implement this interface beyond ordinary candle volume.
+The implemented `OrderFlowProvider` protocol isolates vendor transport behind
+identical historical and live normalized batches. Every batch identifies the
+provider, explicit futures contract, timestamp range, granularity, entitlement,
+sequence coverage, data quality, and limitations. Vendor SDK types may not
+escape the adapter.
+
+Normalized immutable contracts now exist for trades, quotes, provider price-
+level aggregates, gaps, and authority execution-location windows. Analytical
+metadata includes `confidence_reasons`, which contains descriptive provenance
+reasons only. It is not a score and is excluded from authority, confluence,
+overlay, recommendation, and rendering behavior.
+
+Yahoo Finance is explicitly rejected by this boundary because it is an
+OHLCV-only source. Candle direction cannot estimate delta or bid/ask volume,
+ordinary bar volume is not order flow, and Yahoo candles cannot be expanded
+into a synthetic footprint.
+
+Typed result contracts and independent engine protocols exist for Delta,
+Cumulative Delta, Bid/Ask Imbalance, Footprint, Absorption, and Exhaustion.
+Their calculations, thresholds, anchors, event windows, and detection rules
+remain unimplemented and require separate approval. The generic integration
+adapter can consume only a completed assessment supplied by a future approved
+engine; it adds no analytical rules and always produces a non-required factor.
 
 ### Trade planner
 
@@ -245,7 +271,8 @@ The future swing-options engine must be a separate strategy system with separate
 
 - The production symbol is currently hard-coded to `NQ=F`; ES selection is planned.
 - Yahoo availability, history limits, and candle construction can affect results.
-- No true bid/ask order flow is available.
+- No live or historical licensed order-flow provider is configured.
+- Order-flow contracts exist, but analytical engine rules remain unimplemented.
 - IFVG lifecycle, optional overlay, chart, and confluence integration exist; IFVG authority behavior is intentionally not implemented.
 - Order Block location evidence is optional and has no authority role.
 - Volume Profile approximation and optional location integration are implemented; a true tick-level profile is not.

@@ -108,13 +108,18 @@ Version 1 establishes the current day-trading platform:
 ### Planned scope
 
 - Select a futures data provider with required exchange entitlements.
-- Implement an order-flow provider interface isolated from strategy logic.
+- Implement a vendor adapter against the existing provider-neutral historical/live interface.
 - Normalize traded-at-bid and traded-at-ask volume.
 - Add delta, cumulative delta, footprint imbalance, and approved absorption/exhaustion evidence.
 - Report unavailable, delayed, or incomplete order-flow state explicitly.
 - Integrate approved order-flow confirmation points through `DecisionAuthority`.
 
 Yahoo Finance cannot provide true bid/ask order flow and will not be used as a substitute for these features.
+
+The provider, provenance, normalized-event, execution-location, domain-result,
+and optional-confluence contracts are implemented. No vendor, credentials,
+licensed data, aggregation interval, imbalance threshold, cumulative-delta
+anchor, absorption rule, or exhaustion rule has been selected or approved.
 
 ### Dependencies
 
