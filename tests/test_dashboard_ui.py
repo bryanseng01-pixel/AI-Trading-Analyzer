@@ -46,11 +46,12 @@ def test_dashboard_uses_authority_layout_and_display_only_selector(monkeypatch):
 
     assert not app.exception
     subheaders = [element.value for element in app.subheader]
-    assert subheaders[:4] == [
+    assert subheaders[:5] == [
         "🧠 AI Trading Assistant",
-        "📊 Displayed Chart — NQ 4 Hour",
-        "📋 Authority Setup Progress",
-        "▫️ 1M Execution FVG Context",
+        "📊 NQ · 4 Hour Chart",
+        "Execution-Zone Inspector",
+        "Setup Timeline",
+        "Setup Evidence",
     ]
     assert "🧠 AI Market Coach" not in subheaders
     assert "📋 Trade Readiness" not in subheaders
@@ -58,31 +59,30 @@ def test_dashboard_uses_authority_layout_and_display_only_selector(monkeypatch):
 
     expander_labels = [element.label for element in app.expander]
     assert expander_labels == [
-        "📊 Technical Diagnostics",
-        "🌍 Session Liquidity",
-        "🧪 Legacy Diagnostics",
+        "Technical Diagnostics",
+        "Location Diagnostics",
+        "Order Flow Diagnostics",
+        "Data / Provenance",
+        "Legacy Diagnostics",
     ]
 
     metric_labels = [element.label for element in app.metric]
-    assert "Authority Confidence" in metric_labels
-    assert "Completed Authority Gates" in metric_labels
+    assert "Instrument" in metric_labels
+    assert "Data" in metric_labels
+    assert "Authority Confidence" not in metric_labels
     assert "Market Score" not in metric_labels
     assert "Readiness Score" not in metric_labels
 
     markdown = [str(element.value) for element in app.markdown]
-    assert any("Preliminary EMA Context Only" in value for value in markdown)
-    assert any("Confirmed Conditions" in value for value in markdown)
-    assert any("Missing Conditions" in value for value in markdown)
+    assert any("Current Setup" in value for value in markdown)
+    assert any("Authority-Required Gates" in value for value in markdown)
+    assert any("Optional Location Evidence" in value for value in markdown)
 
     initial_status = _authority_status(app)
     assert app.radio[0].options == ["NQ", "ES"]
-    statuses = set()
-    for option in app.selectbox[0].options:
-        app.selectbox[0].select(option).run(timeout=30)
-        assert not app.exception
-        statuses.add(_authority_status(app))
-
-    assert statuses == {initial_status}
+    app.selectbox[0].select("1 Minute").run(timeout=30)
+    assert not app.exception
+    assert _authority_status(app) == initial_status
 
 
 def test_instrument_selector_reloads_the_entire_market_data_scope(monkeypatch):
@@ -104,8 +104,12 @@ def test_instrument_selector_reloads_the_entire_market_data_scope(monkeypatch):
 
     assert not app.exception
     assert set(calls) == {"ES=F"}
-    assert app.title[0].value == "📈 AI Trading Analyzer — ES"
+    assert app.title[0].value == "📈 AI Trading Workstation"
     assert any(
-        item.value.startswith("📊 Displayed Chart — ES ")
+        item.value.startswith("📊 ES · ")
         for item in app.subheader
     )
+    instrument_metrics = [
+        item.value for item in app.metric if item.label == "Instrument"
+    ]
+    assert instrument_metrics == ["ES"]
