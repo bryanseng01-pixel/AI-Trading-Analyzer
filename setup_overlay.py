@@ -16,6 +16,11 @@ from order_block_engine import (
     OrderBlockResult,
     select_relevant_order_block,
 )
+from premium_discount_engine import (
+    DealingRangeResult,
+    LocationClassification,
+    evaluate_premium_discount,
+)
 from timeframe_roles import Direction
 
 
@@ -179,6 +184,53 @@ class OrderBlockOverlaySupport:
 
 
 @dataclass(frozen=True)
+class OverlayDealingRange:
+    timeframe: str
+    direction: Direction
+    high: float
+    low: float
+    equilibrium: float
+    formation_start_time: pd.Timestamp
+    formation_end_time: pd.Timestamp
+    source: str
+    classification: LocationClassification
+    importance: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.high <= self.low:
+            raise ValueError("Overlay dealing-range high must exceed low.")
+        if self.equilibrium != (self.high + self.low) / 2.0:
+            raise ValueError("Overlay dealing-range equilibrium is inconsistent.")
+
+
+@dataclass(frozen=True)
+class PremiumDiscountOverlaySupport:
+    applicable: bool
+    evaluated: bool
+    dealing_range: OverlayDealingRange | None
+    classification: LocationClassification | None
+    directionally_aligned: bool | None
+    explanation: str
+    limitations: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if self.evaluated:
+            if not self.applicable or self.dealing_range is None:
+                raise ValueError("Evaluated Premium/Discount requires a valid range.")
+            if self.classification is None or self.directionally_aligned is None:
+                raise ValueError("Evaluated Premium/Discount requires classification.")
+        elif any(
+            value is not None
+            for value in (
+                self.dealing_range,
+                self.classification,
+                self.directionally_aligned,
+            )
+        ):
+            raise ValueError("Unevaluated Premium/Discount cannot expose results.")
+
+
+@dataclass(frozen=True)
 class OverlayAnnotation:
     kind: OverlayAnnotationKind
     text: str
@@ -196,6 +248,7 @@ class OverlayVisibility:
     show_execution_zone: bool
     show_optional_ifvg_zone: bool
     show_optional_order_block_zone: bool
+    show_dealing_range: bool
     show_invalidation_level: bool
     show_target_levels: bool
 
@@ -217,6 +270,7 @@ class SetupOverlay:
     active_execution_zone: OverlayZone | None
     ifvg_support: IfvgOverlaySupport
     order_block_support: OrderBlockOverlaySupport
+    premium_discount_support: PremiumDiscountOverlaySupport
     invalidation_level: OverlayLevel | None
     target_levels: tuple[OverlayLevel, ...]
     annotations: tuple[OverlayAnnotation, ...]
@@ -236,6 +290,7 @@ def build_setup_overlay(
     fvg_lifecycle_result: FvgLifecycleResult | None = None,
     minimum_ifvg_size: float | None = None,
     order_block_result: OrderBlockResult | None = None,
+    dealing_range_result: DealingRangeResult | None = None,
 ) -> SetupOverlay:
     """Project authoritative setup state into a chart-ready snapshot."""
 
@@ -382,6 +437,18 @@ def build_setup_overlay(
             order_block_support.supporting_zone is not None
         ),
     )
+    premium_discount_support = _build_premium_discount_support(
+        status=status,
+        direction=direction,
+        execution_zone=execution_zone,
+        execution_zone_visible=visibility.show_execution_zone,
+        range_result=dealing_range_result,
+    )
+    limitations.extend(premium_discount_support.limitations)
+    visibility = replace(
+        visibility,
+        show_dealing_range=(premium_discount_support.dealing_range is not None),
+    )
     annotations = _annotations(
         authority_decision,
         primary_waiting_level=primary_waiting_level,
@@ -391,6 +458,7 @@ def build_setup_overlay(
         execution_zone=execution_zone,
         ifvg_support=ifvg_support,
         order_block_support=order_block_support,
+        premium_discount_support=premium_discount_support,
         visibility=visibility,
     )
 
@@ -410,6 +478,7 @@ def build_setup_overlay(
         active_execution_zone=execution_zone,
         ifvg_support=ifvg_support,
         order_block_support=order_block_support,
+        premium_discount_support=premium_discount_support,
         invalidation_level=None,
         target_levels=(),
         annotations=annotations,
@@ -435,6 +504,7 @@ def _avoid_overlay(
         show_execution_zone=False,
         show_optional_ifvg_zone=False,
         show_optional_order_block_zone=False,
+        show_dealing_range=False,
         show_invalidation_level=False,
         show_target_levels=False,
     )
@@ -461,6 +531,9 @@ def _avoid_overlay(
         ),
         order_block_support=_inactive_order_block_support(
             "Order Block confluence is not applicable while authority status is AVOID."
+        ),
+        premium_discount_support=_inactive_premium_discount_support(
+            "Premium/Discount is not applicable while authority status is AVOID."
         ),
         invalidation_level=None,
         target_levels=(),
@@ -685,6 +758,7 @@ def _visibility(
         show_execution_zone=show_zone,
         show_optional_ifvg_zone=False,
         show_optional_order_block_zone=False,
+        show_dealing_range=False,
         show_invalidation_level=False,
         show_target_levels=False,
     )
@@ -700,6 +774,7 @@ def _annotations(
     execution_zone: OverlayZone | None,
     ifvg_support: IfvgOverlaySupport,
     order_block_support: OrderBlockOverlaySupport,
+    premium_discount_support: PremiumDiscountOverlaySupport,
     visibility: OverlayVisibility,
 ) -> tuple[OverlayAnnotation, ...]:
     direction = decision.roles.context_direction
@@ -731,6 +806,21 @@ def _annotations(
                 kind=OverlayAnnotationKind.STRUCTURE,
                 text=confirmation_level.label,
                 level=confirmation_level,
+            )
+        )
+    if (
+        visibility.show_dealing_range
+        and premium_discount_support.dealing_range is not None
+    ):
+        classification = premium_discount_support.classification
+        annotations.append(
+            OverlayAnnotation(
+                kind=OverlayAnnotationKind.OPTIONAL_CONFLUENCE,
+                text=(
+                    "Authority FVG: "
+                    f"{classification.value.replace('_', ' ').title()} "
+                    "within active 15M range"
+                ),
             )
         )
     if (
@@ -1069,6 +1159,93 @@ def _inactive_order_block_support(
         overlap_bottom=None,
         overlap_top=None,
         overlap_percentage=None,
+        explanation=explanation,
+        limitations=(),
+    )
+
+
+def _build_premium_discount_support(
+    *,
+    status: str,
+    direction: Direction | None,
+    execution_zone: OverlayZone | None,
+    execution_zone_visible: bool,
+    range_result: DealingRangeResult | None,
+) -> PremiumDiscountOverlaySupport:
+    authority_location_available = (
+        status in {"WATCH", "READY"}
+        and direction is not None
+        and execution_zone is not None
+        and execution_zone_visible
+    )
+    if not authority_location_available:
+        return _inactive_premium_discount_support(
+            "Premium/Discount requires a visible authority execution FVG."
+        )
+    if range_result is None or range_result.dealing_range is None:
+        limitations = range_result.limitations if range_result is not None else ()
+        return PremiumDiscountOverlaySupport(
+            applicable=False,
+            evaluated=False,
+            dealing_range=None,
+            classification=None,
+            directionally_aligned=None,
+            explanation="A valid authority-directional 15M range is unavailable.",
+            limitations=limitations,
+        )
+    if range_result.direction != direction:
+        return PremiumDiscountOverlaySupport(
+            applicable=False,
+            evaluated=False,
+            dealing_range=None,
+            classification=None,
+            directionally_aligned=None,
+            explanation="The 15M dealing range direction does not match authority.",
+            limitations=("Premium/Discount range direction is inconsistent.",),
+        )
+
+    assessment = evaluate_premium_discount(
+        range_result,
+        execution_zone_top=execution_zone.top,
+        execution_zone_bottom=execution_zone.bottom,
+    )
+    if assessment is None:
+        return _inactive_premium_discount_support(
+            "The authority execution FVG could not be classified reliably."
+        )
+    dealing_range = assessment.dealing_range
+    overlay_range = OverlayDealingRange(
+        timeframe="15M",
+        direction=dealing_range.direction,
+        high=dealing_range.high,
+        low=dealing_range.low,
+        equilibrium=dealing_range.equilibrium,
+        formation_start_time=dealing_range.formation_start_time,
+        formation_end_time=dealing_range.formation_end_time,
+        source=dealing_range.source.value,
+        classification=assessment.classification,
+        importance="secondary",
+    )
+    return PremiumDiscountOverlaySupport(
+        applicable=True,
+        evaluated=True,
+        dealing_range=overlay_range,
+        classification=assessment.classification,
+        directionally_aligned=assessment.directionally_aligned,
+        explanation=assessment.explanation,
+        limitations=assessment.limitations,
+    )
+
+
+def _inactive_premium_discount_support(
+    explanation: str,
+) -> PremiumDiscountOverlaySupport:
+    return PremiumDiscountOverlaySupport(
+        applicable=False,
+        evaluated=False,
+        dealing_range=None,
+        classification=None,
+        directionally_aligned=None,
         explanation=explanation,
         limitations=(),
     )

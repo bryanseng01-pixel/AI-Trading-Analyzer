@@ -14,6 +14,10 @@ from ifvg_integration import build_ifvg_confluence_factor
 from market_structure import interpret_bias_and_structure
 from order_block_engine import evaluate_order_blocks
 from order_block_integration import build_order_block_confluence_factor
+from premium_discount_engine import construct_dealing_range
+from premium_discount_integration import (
+    build_premium_discount_confluence_factor,
+)
 from sessions import detect_session_levels
 from setup_overlay import build_setup_overlay
 from tradingview_chart import display_tradingview_chart
@@ -110,6 +114,17 @@ order_block_result = evaluate_order_blocks(
     structure_events,
     timeframe="1m",
 )
+dealing_range_result = None
+if authority_decision.roles.context_direction is not None:
+    dealing_range_result = construct_dealing_range(
+        timeframe_analyses["15 Minute"].highs,
+        timeframe_analyses["15 Minute"].lows,
+        direction=authority_decision.roles.context_direction,
+        timeframe="15m",
+        evaluated_through=timeframe_analyses["15 Minute"].data.index[-1]
+        if not timeframe_analyses["15 Minute"].data.empty
+        else None,
+    )
 setup_overlay = build_setup_overlay(
     authority_decision,
     timeframe_analyses,
@@ -117,15 +132,20 @@ setup_overlay = build_setup_overlay(
     fvg_lifecycle_result=fvg_lifecycle_result,
     minimum_ifvg_size=minimum_fvg_size,
     order_block_result=order_block_result,
+    dealing_range_result=dealing_range_result,
 )
 ifvg_confluence_factor = build_ifvg_confluence_factor(setup_overlay)
 order_block_confluence_factor = build_order_block_confluence_factor(setup_overlay)
+premium_discount_confluence_factor = (
+    build_premium_discount_confluence_factor(setup_overlay)
+)
 confluence_result = evaluate_confluence(
     authority_decision,
     setup_overlay,
     contributed_factors=(
         ifvg_confluence_factor,
         order_block_confluence_factor,
+        premium_discount_confluence_factor,
     ),
 )
 trade_plan = authority_decision.trade_plan

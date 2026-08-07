@@ -516,6 +516,86 @@ def display_tradingview_chart(
                         }}
                     ]);
                 }}
+
+                if (setupOverlayData.dealing_range !== null) {{
+                    const range = setupOverlayData.dealing_range;
+                    candleSeries.createPriceLine({{
+                        price: range.high,
+                        color: "#9ca3af",
+                        lineWidth: 1,
+                        lineStyle: LightweightCharts.LineStyle.Dashed,
+                        axisLabelVisible: true,
+                        title: "15M DR High"
+                    }});
+                    candleSeries.createPriceLine({{
+                        price: range.low,
+                        color: "#9ca3af",
+                        lineWidth: 1,
+                        lineStyle: LightweightCharts.LineStyle.Dashed,
+                        axisLabelVisible: true,
+                        title: "15M DR Low"
+                    }});
+                    candleSeries.createPriceLine({{
+                        price: range.equilibrium,
+                        color: "#eab308",
+                        lineWidth: 1,
+                        lineStyle: LightweightCharts.LineStyle.Dotted,
+                        axisLabelVisible: true,
+                        title: "15M EQ 50%"
+                    }});
+
+                    const premiumSeries = chart.addSeries(
+                        LightweightCharts.BaselineSeries,
+                        {{
+                            baseValue: {{
+                                type: "price",
+                                price: range.equilibrium
+                            }},
+                            topFillColor1: "rgba(245, 158, 11, 0.035)",
+                            topFillColor2: "rgba(245, 158, 11, 0.035)",
+                            bottomFillColor1: "rgba(245, 158, 11, 0.0)",
+                            bottomFillColor2: "rgba(245, 158, 11, 0.0)",
+                            topLineColor: "rgba(156, 163, 175, 0.25)",
+                            bottomLineColor: "rgba(156, 163, 175, 0.0)",
+                            lineWidth: 1,
+                            priceLineVisible: false,
+                            lastValueVisible: false
+                        }}
+                    );
+                    premiumSeries.setData([
+                        {{ time: range.start_time, value: range.high }},
+                        {{
+                            time: candleData[candleData.length - 1].time,
+                            value: range.high
+                        }}
+                    ]);
+
+                    const discountSeries = chart.addSeries(
+                        LightweightCharts.BaselineSeries,
+                        {{
+                            baseValue: {{
+                                type: "price",
+                                price: range.equilibrium
+                            }},
+                            topFillColor1: "rgba(20, 184, 166, 0.0)",
+                            topFillColor2: "rgba(20, 184, 166, 0.0)",
+                            bottomFillColor1: "rgba(20, 184, 166, 0.035)",
+                            bottomFillColor2: "rgba(20, 184, 166, 0.035)",
+                            topLineColor: "rgba(156, 163, 175, 0.0)",
+                            bottomLineColor: "rgba(156, 163, 175, 0.25)",
+                            lineWidth: 1,
+                            priceLineVisible: false,
+                            lastValueVisible: false
+                        }}
+                    );
+                    discountSeries.setData([
+                        {{ time: range.start_time, value: range.low }},
+                        {{
+                            time: candleData[candleData.length - 1].time,
+                            value: range.low
+                        }}
+                    ]);
+                }}
             }}
 
             chart.timeScale().fitContent();
@@ -655,6 +735,24 @@ def _serialize_setup_overlay(
             "inversion_time": None,
         }
 
+    dealing_range = None
+    range_overlay = overlay.premium_discount_support.dealing_range
+    if visibility.show_dealing_range and range_overlay is not None:
+        dealing_range = {
+            "timeframe": range_overlay.timeframe,
+            "direction": range_overlay.direction.value,
+            "high": range_overlay.high,
+            "low": range_overlay.low,
+            "equilibrium": range_overlay.equilibrium,
+            "start_time": int(range_overlay.formation_start_time.timestamp()),
+            "formation_end_time": int(
+                range_overlay.formation_end_time.timestamp()
+            ),
+            "source": range_overlay.source,
+            "classification": range_overlay.classification.value,
+            "importance": range_overlay.importance,
+        }
+
     return {
         "active_playbook": overlay.active_playbook,
         "authority_status": overlay.authority_status,
@@ -668,6 +766,7 @@ def _serialize_setup_overlay(
         "execution_zone": execution_zone,
         "optional_ifvg_zone": optional_ifvg_zone,
         "optional_order_block_zone": optional_order_block_zone,
+        "dealing_range": dealing_range,
         "annotations": [annotation.text for annotation in overlay.annotations],
         "limitations": list(overlay.limitations),
     }

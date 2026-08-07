@@ -43,6 +43,8 @@ py-modules = [
     "order_blocks",
     "order_block_engine",
     "order_block_integration",
+    "premium_discount_engine",
+    "premium_discount_integration",
     "sessions",
     "setup_overlay",
     "structure",
