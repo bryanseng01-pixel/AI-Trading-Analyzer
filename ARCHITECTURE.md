@@ -92,6 +92,8 @@ The main page shows authority outputs, the selected chart, authority-gate progre
 | `order_blocks.py` | Basic order-block detector | Retained, currently unused |
 | `order_block_engine.py` | Typed structural Order Block formation, qualified displacement, lifecycle, and deterministic overlap selection | Active analytical engine; non-authoritative |
 | `order_block_integration.py` | Adapts completed Order Block overlay support into one optional, non-required confluence factor | Active non-authoritative adapter |
+| `premium_discount_engine.py` | Builds one latest completed directional 15M swing-leg range and classifies the authority FVG | Active analytical engine; non-authoritative |
+| `premium_discount_integration.py` | Adapts completed Premium/Discount classification into one optional, non-required confluence factor | Active non-authoritative adapter |
 | `ai_market_coach.py` | Earlier scoring, narrative, and game-plan functions | Legacy, non-authoritative |
 | `decision_engine.py` | Earlier weighted trade-plan builder | Legacy, non-authoritative |
 | `trade_checklist.py` | Earlier readiness checklist and recommendation | Legacy, non-authoritative |
@@ -136,10 +138,26 @@ The following are planned boundaries, not implemented behavior.
 Approved location engines may contribute immutable `ConfluenceFactor` results.
 The Confluence Engine accepts those results without knowing how they were
 calculated. It does not determine direction, status, confidence, phase, or a
-recommendation, and it performs no chart or raw-market analysis. IFVG, order
-blocks, premium/discount, volume profile, delta, footprint, bid/ask imbalance,
+recommendation, and it performs no chart or raw-market analysis. Volume
+profile, delta, footprint, bid/ask imbalance,
 absorption, SMT, and OTE are placeholders only and are excluded from current
 implemented-evidence calculations.
+
+IFVG, Order Block, and Premium/Discount engines now have optional adapters.
+Their factors remain non-required and cannot modify authority state.
+
+### Premium / Discount
+
+`premium_discount_engine.py` uses one definition only: the latest completed
+directional 15M swing leg aligned with authority context. Bullish ranges run
+from a confirmed swing low to the subsequent swing high; bearish ranges run
+from a confirmed swing high to the subsequent swing low. A later confirmed
+external swing invalidates the range without fallback to an older range.
+
+The existing authority FVG must be fully contained in the range. Bullish
+discount and bearish premium are optional supporting evidence. Wrong-side,
+equilibrium-crossing, and outside-range locations are evaluable but
+unsatisfied. This engine does not select an execution zone or alter authority.
 
 `ConfluenceResult.location_notes` is reserved for future descriptive
 observations from approved location engines. It remains empty until such an

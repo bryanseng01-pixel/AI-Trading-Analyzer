@@ -95,6 +95,11 @@ optional confluence when it strictly overlaps the same authority FVG. It does
 not satisfy or replace any playbook gate and cannot change playbook status or
 phase.
 
+The authority FVG may also be classified against one active 15M dealing range.
+Bullish discount or bearish premium contributes optional evidence only. The
+range cannot select or replace the FVG, and equilibrium, crossing, wrong-side,
+or outside-range classifications do not change this playbook's status.
+
 ## Long sequence
 
 The current long sequence is:
