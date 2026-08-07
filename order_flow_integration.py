@@ -6,7 +6,7 @@ from order_flow_models import OrderFlowAnalysisMetadata
 
 
 class OrderFlowFactorKey(str, Enum):
-    DELTA = "delta"
+    DELTA_CONFIRMATION = "delta_confirmation"
     CUMULATIVE_DELTA_CONTEXT = "cumulative_delta_context"
     BID_ASK_IMBALANCE = "bid_ask_imbalance"
     FOOTPRINT = "footprint"

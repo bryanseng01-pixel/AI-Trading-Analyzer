@@ -33,6 +33,8 @@ py-modules = [
     "data",
     "decision_authority",
     "decision_engine",
+    "delta_engine",
+    "delta_integration",
     "fair_value_gap",
     "fvg_lifecycle",
     "ict_playbook",

@@ -111,7 +111,7 @@ def test_evaluation_is_deterministic_for_contribution_order(ohlc_factory):
         )
         for key, name, satisfied in (
             ("volume_profile", "Volume Profile", True),
-            ("delta", "Delta", False),
+            ("delta_confirmation", "Delta Confirmation", False),
         )
     )
 

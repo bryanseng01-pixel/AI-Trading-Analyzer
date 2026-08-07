@@ -102,7 +102,7 @@ def test_domain_result_contracts_are_independent_and_immutable():
 
 def test_completed_assessment_adapter_adds_no_order_flow_rules():
     assessment = CompletedOrderFlowAssessment(
-        key=OrderFlowFactorKey.DELTA,
+        key=OrderFlowFactorKey.DELTA_CONFIRMATION,
         name="Delta Confirmation",
         metadata=_metadata(),
         evaluated=True,
@@ -111,7 +111,7 @@ def test_completed_assessment_adapter_adds_no_order_flow_rules():
     )
     factor = build_order_flow_confluence_factor(assessment)
 
-    assert factor.key == "delta"
+    assert factor.key == "delta_confirmation"
     assert factor.active is True
     assert factor.required is False
     assert factor.satisfied is True
@@ -158,7 +158,7 @@ def test_optional_order_flow_factor_cannot_mutate_authority(ohlc_factory):
     original = deepcopy(decision)
     factor = build_order_flow_confluence_factor(
         CompletedOrderFlowAssessment(
-            key=OrderFlowFactorKey.DELTA,
+            key=OrderFlowFactorKey.DELTA_CONFIRMATION,
             name="Delta Confirmation",
             metadata=_metadata(),
             evaluated=True,
@@ -172,7 +172,9 @@ def test_optional_order_flow_factor_cannot_mutate_authority(ohlc_factory):
     assert decision == original
     assert decision.recommendation == "READY"
     assert factor.required is False
-    assert "delta" not in {item.key for item in result.pending_future_factors}
+    assert "delta_confirmation" not in {
+        item.key for item in result.pending_future_factors
+    }
 
 
 def test_no_domain_contract_generates_trade_projections_or_recommendations():

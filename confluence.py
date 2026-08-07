@@ -75,7 +75,7 @@ _FUTURE_FACTORS = (
     ("order_block", "Order Block"),
     ("premium_discount", "Premium/Discount"),
     ("volume_profile", "Volume Profile"),
-    ("delta", "Delta"),
+    ("delta_confirmation", "Delta Confirmation"),
     ("footprint", "Footprint"),
     ("bid_ask_imbalance", "Bid/Ask Imbalance"),
     ("absorption", "Absorption"),
