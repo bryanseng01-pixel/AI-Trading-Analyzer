@@ -4,6 +4,7 @@ import math
 
 import pandas as pd
 
+from delta_aggregation import aggregate_delta_buckets
 from order_flow_engines import DeltaBucket, DeltaResult
 from order_flow_models import (
     AggressorSide,
@@ -338,44 +339,12 @@ def _build_buckets(
 ) -> tuple[DeltaBucket, ...]:
     start = window.interaction_start_time
     assert start is not None
-    grouped: dict[int, list[TradeEvent]] = {}
-    interval_ns = rules.bucket_interval.value
-    for trade in trades:
-        offset_ns = (pd.Timestamp(trade.exchange_timestamp) - start).value
-        index = max(int(offset_ns // interval_ns), 0)
-        grouped.setdefault(index, []).append(trade)
-
-    buckets = []
-    for index in sorted(grouped):
-        bucket_trades = grouped[index]
-        ask = math.fsum(
-            trade.quantity
-            for trade in bucket_trades
-            if trade.aggressor_side == AggressorSide.BUY
-        )
-        bid = math.fsum(
-            trade.quantity
-            for trade in bucket_trades
-            if trade.aggressor_side == AggressorSide.SELL
-        )
-        unknown = math.fsum(
-            trade.quantity
-            for trade in bucket_trades
-            if trade.aggressor_side == AggressorSide.UNKNOWN
-        )
-        bucket_start = start + index * rules.bucket_interval
-        buckets.append(
-            DeltaBucket(
-                start_time=bucket_start,
-                end_time=min(bucket_start + rules.bucket_interval, window.end_time),
-                ask_volume=ask,
-                bid_volume=bid,
-                unknown_volume=unknown,
-                delta=ask - bid,
-                total_classified_volume=ask + bid,
-            )
-        )
-    return tuple(buckets)
+    return aggregate_delta_buckets(
+        trades,
+        bucket_anchor_time=start,
+        evaluated_through=window.end_time,
+        bucket_interval=rules.bucket_interval,
+    )
 
 
 def _fatal_quality_reason(
