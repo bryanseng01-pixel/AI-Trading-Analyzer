@@ -1,10 +1,19 @@
 from dataclasses import replace
 
-from setup_overlay import build_setup_overlay
+from setup_overlay import (
+    OverlayAnnotation,
+    OverlayAnnotationKind,
+    build_setup_overlay,
+)
 from test_decision_authority import _analyses, _evaluate
 from test_setup_overlay import _add_execution_fvg, _sessions
-from tradingview_chart import _serialize_setup_overlay
-from tradingview_chart import display_tradingview_chart
+from tradingview_chart import (
+    LIGHTWEIGHT_CHARTS_CDN_URL,
+    LIGHTWEIGHT_CHARTS_VERSION,
+    _serialize_setup_overlay,
+    build_tradingview_chart_html,
+    display_tradingview_chart,
+)
 
 
 def test_overlay_none_preserves_existing_chart_contract():
@@ -20,7 +29,7 @@ def test_renderer_keeps_overlay_optional(monkeypatch, ohlc_factory):
     )
     rendered = {}
     monkeypatch.setattr(
-        "tradingview_chart.components.html",
+        "tradingview_chart.st.iframe",
         lambda html, **kwargs: rendered.update(html=html, kwargs=kwargs),
     )
 
@@ -28,6 +37,48 @@ def test_renderer_keeps_overlay_optional(monkeypatch, ohlc_factory):
 
     assert "const setupOverlayData = null;" in rendered["html"]
     assert "candleSeries.setData(candleData);" in rendered["html"]
+    assert rendered["kwargs"] == {
+        "width": "stretch",
+        "height": 700,
+        "tab_index": -1,
+    }
+
+
+def test_chart_runtime_is_version_pinned_and_responsive(ohlc_factory):
+    data = ohlc_factory([(100, 101, 99, 100, 10)])
+
+    html = build_tradingview_chart_html(data, height=640)
+
+    assert LIGHTWEIGHT_CHARTS_VERSION == "5.0.9"
+    assert LIGHTWEIGHT_CHARTS_CDN_URL in html
+    assert f"height: 640px" in html
+    assert "new ResizeObserver" in html
+    assert "Chart runtime unavailable." in html
+    assert "innerHTML" not in html
+    assert "annotation.textContent = text;" in html
+
+
+def test_annotation_text_is_json_encoded_not_executable(ohlc_factory):
+    analyses = _analyses(ohlc_factory)
+    decision = _evaluate(analyses, {})
+    overlay = build_setup_overlay(decision, analyses, {})
+    overlay = replace(
+        overlay,
+        annotations=(
+            OverlayAnnotation(
+                kind=OverlayAnnotationKind.LIMITATION,
+                text="</script><script>unsafe()</script>",
+            ),
+        ),
+    )
+
+    html = build_tradingview_chart_html(
+        analyses["1 Minute"].data,
+        setup_overlay=overlay,
+    )
+
+    assert "</script><script>unsafe()" not in html
+    assert "\\u003c/script\\u003e\\u003cscript\\u003eunsafe()" in html
 
 
 def test_ready_overlay_serializes_only_visible_authority_objects(ohlc_factory):

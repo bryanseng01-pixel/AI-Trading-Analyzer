@@ -1,12 +1,18 @@
 import json
 
 import pandas as pd
-import streamlit.components.v1 as components
+import streamlit as st
 
 from setup_overlay import SetupOverlay
 
+LIGHTWEIGHT_CHARTS_VERSION = "5.0.9"
+LIGHTWEIGHT_CHARTS_CDN_URL = (
+    f"https://unpkg.com/lightweight-charts@{LIGHTWEIGHT_CHARTS_VERSION}/"
+    "dist/lightweight-charts.standalone.production.js"
+)
 
-def display_tradingview_chart(
+
+def build_tradingview_chart_html(
     data: pd.DataFrame,
     high_labels=None,
     low_labels=None,
@@ -17,11 +23,11 @@ def display_tradingview_chart(
     fvgs=None,
     setup_overlay: SetupOverlay | None = None,
     height: int = 700,
-) -> None:
+) -> str | None:
 
 
     """
-    Displays candlestick data using TradingView Lightweight Charts.
+    Build the self-contained TradingView Lightweight Charts document.
 
     Args:
         data: DataFrame containing Open, High, Low, and Close columns.
@@ -141,12 +147,12 @@ def display_tradingview_chart(
             }
         )
 
-    candles_json = json.dumps(chart_data)
-    ema_json = json.dumps(ema_data)
-    markers_json = json.dumps(markers)
-    bos_json = json.dumps(bos_line)
-    choch_json = json.dumps(choch_line)
-    liquidity_json = json.dumps(liquidity_lines)
+    candles_json = _json_for_html(chart_data)
+    ema_json = _json_for_html(ema_data)
+    markers_json = _json_for_html(markers)
+    bos_json = _json_for_html(bos_line)
+    choch_json = _json_for_html(choch_line)
+    liquidity_json = _json_for_html(liquidity_lines)
 
     active_fvgs = []
 
@@ -169,8 +175,8 @@ def display_tradingview_chart(
             }
         )
 
-    fvg_json = json.dumps(active_fvgs)
-    setup_overlay_json = json.dumps(
+    fvg_json = _json_for_html(active_fvgs)
+    setup_overlay_json = _json_for_html(
         _serialize_setup_overlay(setup_overlay)
     )
     
@@ -179,10 +185,6 @@ def display_tradingview_chart(
     <html>
     <head>
         <meta charset="UTF-8">
-
-        <script
-            src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js">
-        </script>
 
         <style>
             html, body {{
@@ -211,14 +213,51 @@ def display_tradingview_chart(
                 font: 12px sans-serif;
                 pointer-events: none;
             }}
+
+            #chart-fallback {{
+                display: none;
+                width: 100%;
+                height: {height}px;
+                align-items: center;
+                justify-content: center;
+                box-sizing: border-box;
+                padding: 24px;
+                border: 1px solid #374151;
+                color: #d1d4dc;
+                background: #0e1117;
+                font: 14px sans-serif;
+                text-align: center;
+            }}
         </style>
     </head>
 
     <body>
         <div id="chart"></div>
         <div id="setup-summary"></div>
+        <div id="chart-fallback" role="status">
+            Chart runtime unavailable. Analytical results remain available in
+            the workstation.
+        </div>
 
         <script>
+            function showChartFallback() {{
+                const chartContainer = document.getElementById("chart");
+                const overlaySummary = document.getElementById("setup-summary");
+                const fallback = document.getElementById("chart-fallback");
+                chartContainer.style.display = "none";
+                overlaySummary.style.display = "none";
+                fallback.style.display = "flex";
+            }}
+        </script>
+        <script
+            src="{LIGHTWEIGHT_CHARTS_CDN_URL}"
+            onerror="showChartFallback()">
+        </script>
+
+        <script>
+            if (typeof LightweightCharts === "undefined") {{
+                showChartFallback();
+            }} else {{
             const chartContainer = document.getElementById("chart");
 
             const chart = LightweightCharts.createChart(
@@ -406,9 +445,12 @@ def display_tradingview_chart(
             if (setupOverlayData === null) {{
                 overlaySummary.style.display = "none";
             }} else {{
-                overlaySummary.innerHTML = setupOverlayData.annotations
-                    .map((text) => `<div>${{text}}</div>`)
-                    .join("");
+                overlaySummary.replaceChildren();
+                setupOverlayData.annotations.forEach((text) => {{
+                    const annotation = document.createElement("div");
+                    annotation.textContent = text;
+                    overlaySummary.appendChild(annotation);
+                }});
 
                 setupOverlayData.levels.forEach((level) => {{
                     const levelColor =
@@ -659,15 +701,59 @@ def display_tradingview_chart(
             }});
 
             resizeObserver.observe(chartContainer);
+            }}
         </script>
     </body>
     </html>
     """
 
-    components.html(
-        html_code,
+    return html_code
+
+
+def render_tradingview_chart_html(html_code: str, *, height: int) -> None:
+    """Render a completed chart document through Streamlit's iframe API."""
+
+    st.iframe(html_code, width="stretch", height=height, tab_index=-1)
+
+
+def display_tradingview_chart(
+    data: pd.DataFrame,
+    high_labels=None,
+    low_labels=None,
+    bos=None,
+    choch=None,
+    equal_highs=None,
+    equal_lows=None,
+    fvgs=None,
+    setup_overlay: SetupOverlay | None = None,
+    height: int = 700,
+) -> None:
+    """Build and render the chart without deriving analytical state."""
+
+    html_code = build_tradingview_chart_html(
+        data,
+        high_labels=high_labels,
+        low_labels=low_labels,
+        bos=bos,
+        choch=choch,
+        equal_highs=equal_highs,
+        equal_lows=equal_lows,
+        fvgs=fvgs,
+        setup_overlay=setup_overlay,
         height=height,
-        scrolling=False,
+    )
+    if html_code is not None:
+        render_tradingview_chart_html(html_code, height=height)
+
+
+def _json_for_html(value) -> str:
+    """Serialize data as JSON while preventing an embedded script terminator."""
+
+    return (
+        json.dumps(value)
+        .replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
     )
 
 
