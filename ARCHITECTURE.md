@@ -104,6 +104,8 @@ The main page shows authority outputs, the selected chart, authority-gate progre
 | `decision_engine.py` | Earlier weighted trade-plan builder | Legacy, non-authoritative |
 | `delta_engine.py` | Builds stable authority-FVG observation windows, calculates deterministic location-only Delta, and produces conservative directional assessments | Active analytical engine; synthetic normalized trades only |
 | `delta_integration.py` | Adapts a completed Delta location assessment into the optional `delta_confirmation` factor | Active non-authoritative adapter |
+| `delta_aggregation.py` | Shared deterministic BUY/SELL/UNKNOWN bucket arithmetic and immutable completed `DeltaBucketSeries` contract | Active order-flow calculation boundary |
+| `cumulative_delta_engine.py` | Recomputes zero-based current-session Cumulative Delta from completed buckets and describes authority-interaction context | Active descriptive engine; no confluence or UI integration |
 | `trade_checklist.py` | Earlier readiness checklist and recommendation | Legacy, non-authoritative |
 | `ict_playbook.py` | Earlier standalone ICT playbook evaluator | Legacy, non-authoritative |
 
@@ -261,9 +263,22 @@ failure, contract mismatch, conflicting duplicates, and unresolved corrections
 fail closed for directional confluence. The optional `delta_confirmation`
 factor consumes only the completed assessment and cannot modify authority.
 
-Cumulative Delta, Bid/Ask Imbalance, Footprint, Absorption, and Exhaustion
-calculations remain unimplemented and require separate approval. No licensed
-provider, live connection, application integration, or Delta UI exists.
+Cumulative Delta is also implemented as a separate pure engine. Its sole
+normal Version 1 anchor is the current scheduled 08:30 ET New York session
+open, initialized to zero. It consumes completed canonical one-second
+`DeltaBucketSeries` objects produced through the same shared arithmetic used by
+DeltaEngine. Gaps, rollover, entitlement failure, unresolved corrections, and
+unexpected provenance fail closed; delayed and low-coverage series remain
+degraded diagnostics.
+
+Cumulative location assessment reports only movement before and during an
+authority interaction. `supportive` remains `None`, and the
+`cumulative_delta_context` Confluence placeholder remains inactive. No price-
+alignment or divergence rule exists.
+
+Bid/Ask Imbalance, Footprint, Absorption, and Exhaustion calculations remain
+unimplemented and require separate approval. No licensed provider, live
+connection, application integration, or order-flow UI exists.
 
 ### Trade planner
 
@@ -289,6 +304,7 @@ The future swing-options engine must be a separate strategy system with separate
 - Yahoo availability, history limits, and candle construction can affect results.
 - No live or historical licensed order-flow provider is configured.
 - Delta calculation and assessment rules exist for normalized synthetic data; no licensed feed is configured.
+- Cumulative Delta exists as descriptive context only; its Confluence placeholder remains inactive.
 - Other order-flow analytical engine rules remain unimplemented.
 - IFVG lifecycle, optional overlay, chart, and confluence integration exist; IFVG authority behavior is intentionally not implemented.
 - Order Block location evidence is optional and has no authority role.

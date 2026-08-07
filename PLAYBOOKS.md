@@ -201,6 +201,13 @@ replayed trade events around the existing authority FVG. Its optional
 because no licensed provider is configured. It remains non-required and cannot
 change this playbook's status, phase, gates, direction, or recommendation.
 
+The separate Cumulative Delta engine can recompute descriptive session context
+from an explicit zero-based 08:30 ET anchor and completed Delta buckets. It may
+describe cumulative movement before and during the authority-FVG interaction,
+but it supplies no directional support result. Its
+`cumulative_delta_context` placeholder remains inactive and excluded from
+Confluence evidence totals.
+
 Future evidence may enter `DecisionAuthority` only after a separately approved
 playbook change. Until then it remains optional, non-authoritative location
 evidence and cannot publish an independent recommendation.

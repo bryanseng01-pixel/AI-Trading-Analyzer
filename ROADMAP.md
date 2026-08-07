@@ -127,6 +127,12 @@ fail-closed quality rules, and optional `delta_confirmation` adaptation. It is
 not connected to Yahoo, a live feed, SetupOverlay, or the dashboard. Provider
 selection and production-data validation remain prerequisites for runtime use.
 
+The Cumulative Delta engine is implemented as a separate pure, descriptive
+engine over canonical completed Delta buckets. It resets at the scheduled
+08:30 ET session anchor, never carries state across rollover, and fails closed
+when continuity cannot be proven. Price alignment, divergence semantics,
+Confluence activation, live state storage, and UI presentation remain deferred.
+
 ### Dependencies
 
 - Vendor selection and commercial agreement
