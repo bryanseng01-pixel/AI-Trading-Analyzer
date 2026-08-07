@@ -88,7 +88,7 @@ EMA alignment alone cannot satisfy the trigger. The 1M trigger is structural evi
 
 The current temporary execution-location gate requires at least one active 1M FVG in the HTF-context direction. FVG formation uses the first candle's high/low and the third candle's high/low. Existing mitigation and dashboard size/count filtering remain in effect.
 
-This is an availability gate, not a complete execution plan. The current system does not define an entry price, retracement requirement, stop, target, or risk/reward threshold. IFVG behavior is not implemented.
+This is an availability gate, not a complete execution plan. The current system does not define an entry price, retracement requirement, stop, target, or risk/reward threshold. Typed IFVG lifecycle analysis exists as isolated infrastructure, but IFVG behavior is not integrated into this playbook or its authority gate.
 
 ## Long sequence
 

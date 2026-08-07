@@ -51,8 +51,8 @@ Version 1 establishes the current day-trading platform:
 
 ### Planned scope
 
-- Define typed FVG lifecycle states.
-- Add IFVG only after approving the rule that confirmation requires a candle close through the zone and documenting all other lifecycle details.
+- Integrate the implemented typed FVG lifecycle states only after validating their isolated analytical output.
+- Add the implemented close-confirmed IFVG lifecycle to overlay, confluence, or authority paths only through separately approved integration slices.
 - Approve and integrate order-block formation, validity, mitigation, and invalidation rules.
 - Refine liquidity-pool lifecycle and session selection.
 - Define stronger 15M thesis-reversal and invalidation rules.
