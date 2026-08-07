@@ -47,6 +47,8 @@ def test_ready_overlay_serializes_only_visible_authority_objects(ohlc_factory):
     assert serialized["total_steps"] == 6
     assert serialized["execution_zone"]["bottom"] == 100.0
     assert serialized["execution_zone"]["top"] == 106.0
+    assert serialized["execution_zone"]["purpose"] == "authority_required"
+    assert serialized["optional_ifvg_zone"] is None
     assert {level["role"] for level in serialized["levels"]} == {
         "liquidity",
         "confirmation",
@@ -72,6 +74,7 @@ def test_avoid_overlay_serializes_no_levels_or_zone(ohlc_factory):
     assert serialized["authority_status"] == "AVOID"
     assert serialized["levels"] == []
     assert serialized["execution_zone"] is None
+    assert serialized["optional_ifvg_zone"] is None
     assert serialized["annotations"] == [
         "AVOID — 4H and 1H preliminary context conflicts."
     ]

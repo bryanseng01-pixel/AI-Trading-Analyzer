@@ -462,6 +462,33 @@ def display_tradingview_chart(
                         }}
                     ]);
                 }}
+
+                if (setupOverlayData.optional_ifvg_zone !== null) {{
+                    const zone = setupOverlayData.optional_ifvg_zone;
+                    const ifvgSeries = chart.addSeries(
+                        LightweightCharts.BaselineSeries,
+                        {{
+                            baseValue: {{ type: "price", price: zone.bottom }},
+                            topFillColor1: "rgba(168, 85, 247, 0.05)",
+                            topFillColor2: "rgba(168, 85, 247, 0.05)",
+                            bottomFillColor1: "rgba(168, 85, 247, 0.05)",
+                            bottomFillColor2: "rgba(168, 85, 247, 0.05)",
+                            topLineColor: "#a855f7",
+                            bottomLineColor: "#a855f7",
+                            lineStyle: LightweightCharts.LineStyle.Dashed,
+                            lineWidth: 2,
+                            priceLineVisible: false,
+                            lastValueVisible: false
+                        }}
+                    );
+                    ifvgSeries.setData([
+                        {{ time: zone.start_time, value: zone.top }},
+                        {{
+                            time: candleData[candleData.length - 1].time,
+                            value: zone.top
+                        }}
+                    ]);
+                }}
             }}
 
             chart.timeScale().fitContent();
@@ -552,6 +579,35 @@ def _serialize_setup_overlay(
             "formation_end_time": int(zone.formation_end_time.timestamp()),
             "source": zone.source,
             "importance": zone.importance,
+            "kind": zone.kind.value,
+            "purpose": zone.purpose.value,
+            "inversion_time": (
+                int(zone.inversion_time.timestamp())
+                if zone.inversion_time is not None
+                else None
+            ),
+        }
+
+    optional_ifvg_zone = None
+    zone = overlay.ifvg_support.supporting_zone
+    if visibility.show_optional_ifvg_zone and zone is not None:
+        optional_ifvg_zone = {
+            "top": zone.top,
+            "bottom": zone.bottom,
+            "timeframe": zone.timeframe,
+            "direction": zone.direction.value,
+            "label": zone.label,
+            "start_time": int(zone.start_time.timestamp()),
+            "formation_end_time": int(zone.formation_end_time.timestamp()),
+            "source": zone.source,
+            "importance": zone.importance,
+            "kind": zone.kind.value,
+            "purpose": zone.purpose.value,
+            "inversion_time": (
+                int(zone.inversion_time.timestamp())
+                if zone.inversion_time is not None
+                else None
+            ),
         }
 
     return {
@@ -565,6 +621,7 @@ def _serialize_setup_overlay(
         "completion_percentage": overlay.completion_percentage,
         "levels": levels,
         "execution_zone": execution_zone,
+        "optional_ifvg_zone": optional_ifvg_zone,
         "annotations": [annotation.text for annotation in overlay.annotations],
         "limitations": list(overlay.limitations),
     }

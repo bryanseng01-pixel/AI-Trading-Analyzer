@@ -5,9 +5,12 @@ import streamlit as st
 
 from analysis_pipeline import analyze_timeframe, select_active_fvgs
 from authority_market_story import build_authority_market_story
+from confluence import evaluate_confluence
 from dashboard import render_market_brief, render_setup_progress
 from data import get_market_data
 from decision_authority import DecisionAuthority
+from fvg_lifecycle import evaluate_fvg_lifecycles
+from ifvg_integration import build_ifvg_confluence_factor
 from market_structure import interpret_bias_and_structure
 from sessions import detect_session_levels
 from setup_overlay import build_setup_overlay
@@ -90,10 +93,23 @@ authority_decision = DecisionAuthority().evaluate(
     minimum_fvg_size=minimum_fvg_size,
     maximum_fvgs=maximum_fvgs,
 )
+fvg_lifecycle_result = evaluate_fvg_lifecycles(
+    execution_analysis.data,
+    execution_analysis.fvgs,
+    timeframe="1m",
+)
 setup_overlay = build_setup_overlay(
     authority_decision,
     timeframe_analyses,
     session_levels,
+    fvg_lifecycle_result=fvg_lifecycle_result,
+    minimum_ifvg_size=minimum_fvg_size,
+)
+ifvg_confluence_factor = build_ifvg_confluence_factor(setup_overlay)
+confluence_result = evaluate_confluence(
+    authority_decision,
+    setup_overlay,
+    contributed_factors=(ifvg_confluence_factor,),
 )
 trade_plan = authority_decision.trade_plan
 playbook = authority_decision.playbook
