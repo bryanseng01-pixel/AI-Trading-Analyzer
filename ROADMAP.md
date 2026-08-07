@@ -78,10 +78,11 @@ Version 1 establishes the current day-trading platform:
 
 ### Planned scope
 
-- Introduce a provider-independent volume-profile service.
-- Define session and, if approved, composite profile construction.
-- Expose POC, value-area high/low, high-volume nodes, and low-volume nodes.
-- Evaluate location, acceptance, and rejection through approved authority inputs.
+- Continue validating the implemented typed previous-completed-New-York-session profile approximation.
+- Preserve centralized `VolumeProfileRules` and the approved 70% value area/four-tick bin parameters.
+- Keep POC, value-area high/low, high-volume nodes, and low-volume nodes provider-independent and deterministic.
+- Keep current VAH/VAL location evidence optional; POC/HVN/LVN remain descriptive.
+- Research future session/composite variants separately rather than adding fallback profiles.
 - Introduce a separate trade-planner boundary.
 - Define proposed entry, invalidation, target, risk/reward, and sizing validation only after explicit approval.
 - Keep execution manual unless a later product decision authorizes otherwise.

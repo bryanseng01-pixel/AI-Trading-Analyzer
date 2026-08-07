@@ -94,6 +94,8 @@ The main page shows authority outputs, the selected chart, authority-gate progre
 | `order_block_integration.py` | Adapts completed Order Block overlay support into one optional, non-required confluence factor | Active non-authoritative adapter |
 | `premium_discount_engine.py` | Builds one latest completed directional 15M swing-leg range and classifies the authority FVG | Active analytical engine; non-authoritative |
 | `premium_discount_integration.py` | Adapts completed Premium/Discount classification into one optional, non-required confluence factor | Active non-authoritative adapter |
+| `volume_profile_engine.py` | Builds one previous completed New York session bar-distributed volume-at-price approximation and assesses only the authority FVG | Active analytical engine; non-authoritative |
+| `volume_profile_integration.py` | Projects completed profile context into SetupOverlay and one optional, non-required confluence factor | Active non-authoritative adapter |
 | `ai_market_coach.py` | Earlier scoring, narrative, and game-plan functions | Legacy, non-authoritative |
 | `decision_engine.py` | Earlier weighted trade-plan builder | Legacy, non-authoritative |
 | `trade_checklist.py` | Earlier readiness checklist and recommendation | Legacy, non-authoritative |
@@ -139,12 +141,13 @@ Approved location engines may contribute immutable `ConfluenceFactor` results.
 The Confluence Engine accepts those results without knowing how they were
 calculated. It does not determine direction, status, confidence, phase, or a
 recommendation, and it performs no chart or raw-market analysis. Volume
-profile, delta, footprint, bid/ask imbalance,
+delta, footprint, bid/ask imbalance,
 absorption, SMT, and OTE are placeholders only and are excluded from current
 implemented-evidence calculations.
 
-IFVG, Order Block, and Premium/Discount engines now have optional adapters.
-Their factors remain non-required and cannot modify authority state.
+IFVG, Order Block, Premium/Discount, and Volume Profile engines now have
+optional adapters. Their factors remain non-required and cannot modify
+authority state.
 
 ### Premium / Discount
 
@@ -165,7 +168,23 @@ engine and its rules are approved.
 
 ### Volume profile
 
-A volume-profile service should consume a documented futures volume feed and produce typed profile results such as POC, value-area boundaries, and volume nodes. It may provide location context to `DecisionAuthority`; it must not render an independent recommendation.
+`volume_profile_engine.py` builds one profile definition only: the previous
+completed New York session, using fixed 1M OHLCV and the existing 08:30-17:00
+America/New_York window. `VolumeProfileRules` centralizes the approved 70%
+value area and four 0.25-tick bins per one-point price bin. The profile uses a
+deterministic uniform distribution of each bar's reported volume across every
+intersected price bin.
+
+This is a bar-volume approximation, not a true tick-level volume profile. It
+cannot identify traded-at-bid/ask volume, delta, footprint imbalance,
+absorption, aggressor side, or intrabar sequencing. Missing bars and the lack
+of holiday/early-close calendar handling remain visible limitations.
+
+The engine produces POC, VAH, VAL, and descriptive HVN/LVN nodes. It evaluates
+only the existing authority-selected 1M FVG. Bullish location at or below VAL
+and bearish location at or above VAH may contribute one optional factor. POC,
+HVN, and LVN observations are descriptive and do not independently satisfy
+confluence. The profile does not select an execution zone or modify authority.
 
 ### IFVG
 
@@ -229,5 +248,6 @@ The future swing-options engine must be a separate strategy system with separate
 - No true bid/ask order flow is available.
 - IFVG lifecycle, optional overlay, chart, and confluence integration exist; IFVG authority behavior is intentionally not implemented.
 - Order Block location evidence is optional and has no authority role.
-- Volume profile, execution planning, entries, stops, targets, and sizing are not implemented.
+- Volume Profile approximation and optional location integration are implemented; a true tick-level profile is not.
+- Execution planning, entries, stops, targets, and sizing are not implemented.
 - Stronger 15M thesis-invalidation rules remain undefined.

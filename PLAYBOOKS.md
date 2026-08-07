@@ -100,6 +100,12 @@ Bullish discount or bearish premium contributes optional evidence only. The
 range cannot select or replace the FVG, and equilibrium, crossing, wrong-side,
 or outside-range classifications do not change this playbook's status.
 
+The same authority FVG may be evaluated against the previous completed New
+York session's bar-volume profile approximation. Bullish location at or below
+VAL and bearish location at or above VAH may appear as optional evidence.
+POC, HVN, and LVN relationships remain descriptive. Volume Profile cannot
+replace an authority gate, select another execution zone, or alter status.
+
 ## Long sequence
 
 The current long sequence is:
@@ -180,7 +186,10 @@ The following are planned integration points, not current requirements:
 
 ### Volume profile
 
-Future approved rules may use POC, value-area boundaries, high-volume nodes, or low-volume nodes to evaluate location, acceptance, and rejection. Exact profile construction and gating rules remain undefined.
+The implemented profile is limited to the previous completed New York session
+and uniformly distributes Yahoo bar volume across intersected price bins. It
+is optional location evidence only. Future profile variants, acceptance and
+rejection rules, composite profiles, and authority gating remain undefined.
 
 ### True order flow
 
