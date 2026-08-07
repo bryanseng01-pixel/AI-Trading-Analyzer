@@ -117,6 +117,10 @@ class FuturesContract:
     def __post_init__(self) -> None:
         if not self.contract_code:
             raise ValueError("An explicit futures contract code is required.")
+        if self.contract_code.endswith("=F"):
+            raise ValueError(
+                "Yahoo continuous symbols are not real order-flow contract identifiers."
+            )
         if not 1 <= self.contract_month <= 12:
             raise ValueError("contract_month must be between 1 and 12.")
         _require_aware(self.expiration_time, "expiration_time")

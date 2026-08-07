@@ -3,29 +3,18 @@ from zoneinfo import ZoneInfo
 
 import streamlit as st
 
-from analysis_pipeline import analyze_timeframe, select_active_fvgs
+from analysis_pipeline import select_active_fvgs
 from authority_market_story import build_authority_market_story
-from confluence import evaluate_confluence
 from dashboard import render_market_brief, render_setup_progress
 from data import get_market_data
-from decision_authority import DecisionAuthority
-from fvg_lifecycle import evaluate_fvg_lifecycles
-from ifvg_integration import build_ifvg_confluence_factor
+from instrument_pipeline import (
+    AnalysisSettings,
+    TIMEFRAMES,
+    build_instrument_analysis,
+)
+from instruments import INSTRUMENT_REGISTRY
 from market_structure import interpret_bias_and_structure
-from order_block_engine import evaluate_order_blocks
-from order_block_integration import build_order_block_confluence_factor
-from premium_discount_engine import construct_dealing_range
-from premium_discount_integration import (
-    build_premium_discount_confluence_factor,
-)
-from sessions import detect_session_levels
-from setup_overlay import build_setup_overlay
 from tradingview_chart import display_tradingview_chart
-from volume_profile_engine import build_previous_new_york_profile
-from volume_profile_integration import (
-    attach_volume_profile_support,
-    build_volume_profile_confluence_factor,
-)
 
 
 st.set_page_config(
@@ -34,36 +23,35 @@ st.set_page_config(
     layout="wide",
 )
 st.sidebar.title("⚙️ Chart Settings")
+instrument_key = st.sidebar.radio(
+    "Instrument",
+    options=INSTRUMENT_REGISTRY.keys,
+    horizontal=True,
+)
+instrument = INSTRUMENT_REGISTRY.resolve(instrument_key)
 st.sidebar.subheader("FVG Settings")
 minimum_fvg_size = st.sidebar.number_input(
     "Minimum FVG Size (points)",
     min_value=0.25,
     max_value=100.0,
-    value=5.0,
+    value=instrument.strategy_defaults.minimum_fvg_size_points,
     step=0.25,
 )
 maximum_fvgs = st.sidebar.slider(
     "Maximum Active FVGs",
     min_value=1,
     max_value=10,
-    value=3,
+    value=instrument.strategy_defaults.maximum_active_fvgs,
 )
 if st.sidebar.button("🔄 Refresh Market Data"):
     st.cache_data.clear()
     st.rerun()
 
-st.title("📈 AI Trading Analyzer")
-last_updated = datetime.now(ZoneInfo("America/New_York"))
+st.title(f"📈 AI Trading Analyzer — {instrument.key}")
+last_updated = datetime.now(ZoneInfo(instrument.display_timezone))
 st.caption("Last refreshed: " + last_updated.strftime("%I:%M:%S %p ET"))
 
-symbol = "NQ=F"
-timeframes = {
-    "4 Hour": {"interval": "4h", "role": "🧭 Context"},
-    "1 Hour": {"interval": "1h", "role": "✅ Context"},
-    "15 Minute": {"interval": "15m", "role": "📈 Setup"},
-    "5 Minute": {"interval": "5m", "role": "🔍 Confirmation"},
-    "1 Minute": {"interval": "1m", "role": "⚡ Trigger"},
-}
+timeframes = TIMEFRAMES
 
 st.write("Preliminary EMA Context Only")
 st.caption(
@@ -71,14 +59,22 @@ st.caption(
     "requires actual close-confirmed BOS/CHoCH."
 )
 
-timeframe_analyses = {}
+market_frames = {
+    info["interval"]: get_market_data(instrument.key, info["interval"])
+    for info in timeframes.values()
+}
+bundle = build_instrument_analysis(
+    instrument,
+    market_frames,
+    AnalysisSettings(
+        minimum_fvg_size=minimum_fvg_size,
+        maximum_fvgs=maximum_fvgs,
+    ),
+)
+timeframe_analyses = bundle.timeframe_analyses
 bias_cols = st.columns(len(timeframes))
 for index, (name, info) in enumerate(timeframes.items()):
-    analysis = analyze_timeframe(
-        get_market_data(symbol, info["interval"]),
-        info["interval"],
-    )
-    timeframe_analyses[name] = analysis
+    analysis = timeframe_analyses[name]
 
     with bias_cols[index]:
         st.caption(info["role"])
@@ -95,86 +91,17 @@ selected_analysis = timeframe_analyses[selected]
 context_analysis = timeframe_analyses["4 Hour"]
 execution_analysis = timeframe_analyses["1 Minute"]
 
-session_levels = (
-    detect_session_levels(timeframe_analyses["5 Minute"].data) or {}
-)
-authority_decision = DecisionAuthority().evaluate(
-    timeframe_analyses,
-    session_levels,
-    minimum_fvg_size=minimum_fvg_size,
-    maximum_fvgs=maximum_fvgs,
-)
-fvg_lifecycle_result = evaluate_fvg_lifecycles(
-    execution_analysis.data,
-    execution_analysis.fvgs,
-    timeframe="1m",
-)
-structure_events = tuple(
-    event
-    for event in (execution_analysis.bos, execution_analysis.choch)
-    if event is not None
-)
-order_block_result = evaluate_order_blocks(
-    execution_analysis.data,
-    structure_events,
-    timeframe="1m",
-)
-dealing_range_result = None
-if authority_decision.roles.context_direction is not None:
-    dealing_range_result = construct_dealing_range(
-        timeframe_analyses["15 Minute"].highs,
-        timeframe_analyses["15 Minute"].lows,
-        direction=authority_decision.roles.context_direction,
-        timeframe="15m",
-        evaluated_through=timeframe_analyses["15 Minute"].data.index[-1]
-        if not timeframe_analyses["15 Minute"].data.empty
-        else None,
-    )
-setup_overlay = build_setup_overlay(
-    authority_decision,
-    timeframe_analyses,
-    session_levels,
-    fvg_lifecycle_result=fvg_lifecycle_result,
-    minimum_ifvg_size=minimum_fvg_size,
-    order_block_result=order_block_result,
-    dealing_range_result=dealing_range_result,
-)
-volume_profile_result = None
-if not execution_analysis.data.empty:
-    volume_profile_result = build_previous_new_york_profile(
-        execution_analysis.data,
-        evaluated_through=execution_analysis.data.index[-1],
-        tick_size=0.25,
-    )
-setup_overlay = attach_volume_profile_support(
-    setup_overlay,
-    volume_profile_result,
-)
-ifvg_confluence_factor = build_ifvg_confluence_factor(setup_overlay)
-order_block_confluence_factor = build_order_block_confluence_factor(setup_overlay)
-premium_discount_confluence_factor = (
-    build_premium_discount_confluence_factor(setup_overlay)
-)
-volume_profile_confluence_factor = build_volume_profile_confluence_factor(
-    setup_overlay
-)
-confluence_result = evaluate_confluence(
-    authority_decision,
-    setup_overlay,
-    contributed_factors=(
-        ifvg_confluence_factor,
-        order_block_confluence_factor,
-        premium_discount_confluence_factor,
-        volume_profile_confluence_factor,
-    ),
-)
+session_levels = bundle.session_levels
+authority_decision = bundle.authority_decision
+setup_overlay = bundle.setup_overlay
+confluence_result = bundle.confluence_result
 trade_plan = authority_decision.trade_plan
 playbook = authority_decision.playbook
 market_story = build_authority_market_story(authority_decision.roles)
 
 render_market_brief(trade_plan, market_story, playbook)
 
-st.subheader(f"📊 Displayed Chart — {selected}")
+st.subheader(f"📊 Displayed Chart — {instrument.key} {selected}")
 chart_active_fvgs = select_active_fvgs(
     selected_analysis,
     minimum_size=minimum_fvg_size,

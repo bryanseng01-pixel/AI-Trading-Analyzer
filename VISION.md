@@ -2,7 +2,7 @@
 
 ## Product definition
 
-The AI Trading Analyzer is an ICT, volume-profile, and order-flow decision-support platform for discretionary futures traders. Its current focus is intraday analysis of NQ and, in a future instrument-selection step, ES. The product is intended to help a trader follow a repeatable process from higher-timeframe context through setup development, confirmation, and execution location.
+The AI Trading Analyzer is an ICT, volume-profile, and order-flow decision-support platform for discretionary futures traders. Its current focus is selectable intraday analysis of NQ and ES through one shared strategy pipeline. The typed instrument registry is extensible to additional futures without duplicating strategy logic. The product is intended to help a trader follow a repeatable process from higher-timeframe context through setup development, confirmation, and execution location.
 
 The platform is not an automated trade signal, trade-execution system, or guaranteed market-prediction system. A `READY` result means only that the currently approved playbook gates are aligned. It is not an instruction to enter a position. The trader remains responsible for data quality, timing, invalidation, risk, position size, and execution.
 

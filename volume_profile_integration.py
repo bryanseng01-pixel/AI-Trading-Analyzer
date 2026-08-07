@@ -25,6 +25,8 @@ def attach_volume_profile_support(
 ) -> SetupOverlay:
     """Attach completed profile evidence without changing authority state."""
 
+    if profile is not None and profile.instrument_key != setup_overlay.instrument_key:
+        raise ValueError("Volume Profile instrument does not match SetupOverlay.")
     zone = setup_overlay.active_execution_zone
     applicable = (
         setup_overlay.authority_status in {"WATCH", "READY"}
@@ -136,6 +138,7 @@ def build_volume_profile_confluence_factor(
         importance="secondary",
         source="VolumeProfileEngine",
         explanation=support.explanation,
+        instrument_key=setup_overlay.instrument_key,
     )
 
 

@@ -20,4 +20,5 @@ def build_ifvg_confluence_factor(
         importance="secondary",
         source="FvgLifecycleEngine",
         explanation=support.explanation,
+        instrument_key=setup_overlay.instrument_key,
     )

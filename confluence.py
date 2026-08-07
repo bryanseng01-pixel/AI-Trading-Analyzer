@@ -22,6 +22,7 @@ class ConfluenceFactor:
     importance: str | None
     source: str
     explanation: str
+    instrument_key: str = "NQ"
 
     def __post_init__(self) -> None:
         if not self.key or not self.name or not self.source:
@@ -55,6 +56,7 @@ class ConfluenceResult:
     weaknesses: tuple[str, ...]
     explanation: str
     location_notes: tuple[str, ...] = ()
+    instrument_key: str = "NQ"
 
 
 _BUILTIN_FACTORS = (
@@ -105,15 +107,21 @@ def evaluate_confluence(
             importance=importance,
             source="DecisionAuthority",
             explanation=authority_gates[key].explanation,
+            instrument_key=setup_overlay.instrument_key,
         )
         for key, name, importance in _BUILTIN_FACTORS
     )
 
     contributions = tuple(contributed_factors)
     _validate_contributions(contributions)
+    if any(
+        factor.instrument_key != setup_overlay.instrument_key
+        for factor in contributions
+    ):
+        raise ValueError("Confluence factors must match the SetupOverlay instrument.")
     contributions_by_key = {factor.key: factor for factor in contributions}
     placeholders = tuple(
-        _future_placeholder(key, name)
+        _future_placeholder(key, name, setup_overlay.instrument_key)
         for key, name in _FUTURE_FACTORS
         if key not in contributions_by_key
     )
@@ -158,10 +166,11 @@ def evaluate_confluence(
             "evidence factors are satisfied. Future placeholders are excluded."
         ),
         location_notes=(),
+        instrument_key=setup_overlay.instrument_key,
     )
 
 
-def _future_placeholder(key: str, name: str) -> ConfluenceFactor:
+def _future_placeholder(key: str, name: str, instrument_key: str) -> ConfluenceFactor:
     return ConfluenceFactor(
         key=key,
         name=name,
@@ -172,6 +181,7 @@ def _future_placeholder(key: str, name: str) -> ConfluenceFactor:
         importance=None,
         source="Future approved engine",
         explanation="Reserved for a future approved location engine.",
+        instrument_key=instrument_key,
     )
 
 

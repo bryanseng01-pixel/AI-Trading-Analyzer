@@ -6,6 +6,7 @@ The current application is a Streamlit-based, single-process decision-support sy
 
 ```text
 Market data
+    -> Instrument analysis bundle
     -> Timeframe analysis
     -> Timeframe roles
     -> Decision authority
@@ -19,13 +20,17 @@ The chart selector is deliberately outside the strategy path. It selects only th
 
 ### 1. Market data
 
-`data.py` downloads NQ futures data from Yahoo Finance and uses Streamlit caching. Yahoo supplies 1H, 15M, 5M, and 1M data directly; the current 4H candles are resampled from 1H data.
+`instruments.py` owns the immutable, extensible instrument registry. NQ maps to `NQ=F` and ES maps to `ES=F`; both compose the existing order-flow `FuturesInstrument` model and currently use a 0.25 tick. Adding another instrument is a registry-entry change rather than an analytical-engine branch.
+
+`data.py` resolves the selected registry key, downloads its Yahoo Finance symbol, and uses the instrument key plus timeframe as the Streamlit cache identity. Yahoo supplies 1H, 15M, 5M, and 1M data directly; the current 4H candles are resampled from 1H data.
 
 Yahoo Finance is temporary and cannot provide true bid/ask order flow. No current component should infer delta, footprint imbalance, absorption, or exhaustion from Yahoo candles.
 
 ### 2. Timeframe analysis
 
-`analysis_pipeline.analyze_timeframe()` independently analyzes every configured timeframe and returns an immutable `TimeframeAnalysis`. Each result contains its own EMA data, swings, HH/HL/LH/LL labels, structure, close-confirmed BOS/CHoCH, FVGs, and equal highs/lows.
+`instrument_pipeline.build_instrument_analysis()` creates one immutable `InstrumentAnalysisBundle` for the selected instrument. It owns the strategy-wide timeframe analyses, sessions, authority decision, location results, SetupOverlay, Volume Profile, and Confluence result. Integration boundaries reject mixed instrument provenance.
+
+`analysis_pipeline.analyze_timeframe()` independently analyzes every configured timeframe and returns an immutable, instrument-qualified `TimeframeAnalysis`. Each result contains its own EMA data, swings, HH/HL/LH/LL labels, structure, close-confirmed BOS/CHoCH, FVGs, and equal highs/lows.
 
 The five current analyses are 4H, 1H, 15M, 5M, and 1M. No selected chart timeframe is reused as a substitute for another role.
 
@@ -63,7 +68,7 @@ No other current dashboard component is permitted to publish an independent reco
 
 ### 6. Dashboard
 
-`app.py` composes the data and authority pipeline. `dashboard.py` renders the primary authority summary and setup progress. `tradingview_chart.py` renders the selected timeframe using TradingView Lightweight Charts.
+`app.py` selects an instrument from registry-derived options, loads all five instrument-keyed frames, and renders the completed instrument bundle. `dashboard.py` renders the primary authority summary and setup progress. `tradingview_chart.py` renders the selected timeframe using TradingView Lightweight Charts.
 
 The main page shows authority outputs, the selected chart, authority-gate progress, and 1M execution FVG context. Technical, session, and legacy information is presented as non-authoritative diagnostics.
 
@@ -72,6 +77,8 @@ The main page shows authority outputs, the selected chart, authority-gate progre
 | Module | Responsibility | Authority status |
 |---|---|---|
 | `app.py` | Streamlit composition, controls, data orchestration, layout, and diagnostic grouping | Active composition root |
+| `instruments.py` | Extensible immutable instrument registry, Yahoo mapping, shared strategy defaults, and qualified location identities | Active instrument boundary |
+| `instrument_pipeline.py` | Builds and validates one strategy-wide `InstrumentAnalysisBundle` | Active orchestration boundary |
 | `data.py` | Yahoo download, Streamlit caching, history selection, column normalization, and 4H resampling | Active data boundary |
 | `analysis_pipeline.py` | Builds complete independent `TimeframeAnalysis` objects and filters active FVGs | Active analysis boundary |
 | `indicators.py` | EMA calculation and EMA-relative trend label | Active; context input only |
@@ -179,7 +186,8 @@ engine and its rules are approved.
 `volume_profile_engine.py` builds one profile definition only: the previous
 completed New York session, using fixed 1M OHLCV and the existing 08:30-17:00
 America/New_York window. `VolumeProfileRules` centralizes the approved 70%
-value area and four 0.25-tick bins per one-point price bin. The profile uses a
+value area and four ticks per bin. NQ and ES both use a 0.25 tick, producing
+one-point price bins. The profile uses a
 deterministic uniform distribution of each bar's reported volume across every
 intersected price bin.
 
@@ -300,7 +308,7 @@ The future swing-options engine must be a separate strategy system with separate
 
 ## Known constraints
 
-- The production symbol is currently hard-coded to `NQ=F`; ES selection is planned.
+- NQ and ES are selectable through one registry-driven strategy pipeline; additional instruments require validated registry metadata and tests.
 - Yahoo availability, history limits, and candle construction can affect results.
 - No live or historical licensed order-flow provider is configured.
 - Delta calculation and assessment rules exist for normalized synthetic data; no licensed feed is configured.

@@ -52,4 +52,5 @@ def build_order_flow_confluence_factor(
         importance="secondary",
         source=assessment.metadata.engine_name,
         explanation=assessment.explanation,
+        instrument_key=assessment.metadata.provenance.instrument.root_symbol,
     )

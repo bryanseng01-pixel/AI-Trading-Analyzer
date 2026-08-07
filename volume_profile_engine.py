@@ -78,6 +78,7 @@ class ProfileRange:
     ticks_per_bin: int
     bin_size: float
     source: VolumeProfileSource
+    instrument_key: str = "NQ"
 
 
 @dataclass(frozen=True)
@@ -128,6 +129,7 @@ class VolumeProfileResult:
     source: VolumeProfileSource
     data_quality: DataQuality
     limitations: tuple[str, ...]
+    instrument_key: str = "NQ"
 
     def __post_init__(self) -> None:
         if self.validity == ProfileValidity.VALID:
@@ -172,6 +174,7 @@ def build_previous_new_york_profile(
     evaluated_through: pd.Timestamp,
     tick_size: float,
     rules: VolumeProfileRules = DEFAULT_VOLUME_PROFILE_RULES,
+    instrument_key: str = "NQ",
 ) -> VolumeProfileResult:
     """Build one completed New York session bar-volume approximation."""
 
@@ -181,24 +184,24 @@ def build_previous_new_york_profile(
     if not isinstance(rules, VolumeProfileRules):
         raise TypeError("rules must be a VolumeProfileRules instance.")
     if data is None or data.empty:
-        return _unavailable(ProfileValidity.NO_COMPLETED_SESSION)
+        return _unavailable(ProfileValidity.NO_COMPLETED_SESSION, instrument_key)
 
     required_prices = {"Open", "High", "Low", "Close"}
     if not required_prices.issubset(data.columns):
-        return _unavailable(ProfileValidity.INVALID_PRICE_DATA)
+        return _unavailable(ProfileValidity.INVALID_PRICE_DATA, instrument_key)
     if "Volume" not in data.columns:
-        return _unavailable(ProfileValidity.MISSING_VOLUME)
+        return _unavailable(ProfileValidity.MISSING_VOLUME, instrument_key)
 
     localized = _to_new_york_time(data)
     evaluated = _to_new_york_timestamp(evaluated_through)
     selected = _select_latest_completed_session(localized, evaluated)
     if selected is None:
-        return _unavailable(ProfileValidity.NO_COMPLETED_SESSION)
+        return _unavailable(ProfileValidity.NO_COMPLETED_SESSION, instrument_key)
     session_start, session_end, bars = selected
     expected = int((session_end - session_start) / pd.Timedelta(minutes=1))
 
     if bars.empty:
-        return _unavailable(ProfileValidity.INSUFFICIENT_BARS)
+        return _unavailable(ProfileValidity.INSUFFICIENT_BARS, instrument_key)
     numeric = bars[["Open", "High", "Low", "Close", "Volume"]].apply(
         pd.to_numeric, errors="coerce"
     )
@@ -209,20 +212,20 @@ def build_previous_new_york_profile(
             if numeric["Volume"].isna().any()
             else ProfileValidity.INVALID_PRICE_DATA
         )
-        return _unavailable(validity)
+        return _unavailable(validity, instrument_key)
     if (numeric["Volume"] < 0.0).any():
-        return _unavailable(ProfileValidity.MISSING_VOLUME)
+        return _unavailable(ProfileValidity.MISSING_VOLUME, instrument_key)
     invalid_prices = (
         (numeric["High"] < numeric["Low"])
         | (numeric["High"] < numeric[["Open", "Close"]].max(axis=1))
         | (numeric["Low"] > numeric[["Open", "Close"]].min(axis=1))
     )
     if invalid_prices.any():
-        return _unavailable(ProfileValidity.INVALID_PRICE_DATA)
+        return _unavailable(ProfileValidity.INVALID_PRICE_DATA, instrument_key)
 
     total_volume = float(numeric["Volume"].sum())
     if total_volume == 0.0:
-        return _unavailable(ProfileValidity.ZERO_VOLUME)
+        return _unavailable(ProfileValidity.ZERO_VOLUME, instrument_key)
 
     bin_size = tick * rules.ticks_per_bin
     session_low = float(numeric["Low"].min())
@@ -274,6 +277,7 @@ def build_previous_new_york_profile(
         ticks_per_bin=rules.ticks_per_bin,
         bin_size=bin_size,
         source=VolumeProfileSource.YAHOO_BAR_OHLCV_APPROXIMATION,
+        instrument_key=instrument_key,
     )
     return VolumeProfileResult(
         validity=ProfileValidity.VALID,
@@ -289,6 +293,7 @@ def build_previous_new_york_profile(
         source=VolumeProfileSource.YAHOO_BAR_OHLCV_APPROXIMATION,
         data_quality=DataQuality.DEGRADED if missing else DataQuality.APPROXIMATED,
         limitations=tuple(limitations),
+        instrument_key=instrument_key,
     )
 
 
@@ -520,7 +525,7 @@ def _positive_overlap(left_bottom: float, left_top: float, right_bottom: float, 
     return min(left_top, right_top) > max(left_bottom, right_bottom)
 
 
-def _unavailable(validity: ProfileValidity) -> VolumeProfileResult:
+def _unavailable(validity: ProfileValidity, instrument_key: str = "NQ") -> VolumeProfileResult:
     explanation = {
         ProfileValidity.NO_COMPLETED_SESSION: "No completed New York session is available.",
         ProfileValidity.INSUFFICIENT_BARS: "The completed New York session has no eligible bars.",
@@ -542,6 +547,7 @@ def _unavailable(validity: ProfileValidity) -> VolumeProfileResult:
         source=VolumeProfileSource.YAHOO_BAR_OHLCV_APPROXIMATION,
         data_quality=DataQuality.UNAVAILABLE,
         limitations=(explanation,) + _SOURCE_LIMITATIONS,
+        instrument_key=instrument_key,
     )
 
 

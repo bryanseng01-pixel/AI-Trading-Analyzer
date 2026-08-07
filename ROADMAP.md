@@ -22,13 +22,13 @@ Version 1 establishes the current day-trading platform:
 - one `DecisionAuthority`;
 - authority market story and setup progress;
 - display-only chart selection; and
+- registry-driven NQ/ES instrument selection with instrument-keyed caching and provenance;
 - synthetic rule, authority, story, and Streamlit UI tests.
 
 ### Remaining Version 1 work
 
 - Improve empty/partial market-data handling and user-facing errors.
-- Centralize symbol, timeframe, threshold, and session configuration.
-- Add NQ/ES instrument selection without mixing cached results.
+- Continue moving remaining timeframe and session constants into typed configuration where useful.
 - Improve weekend/holiday session selection.
 - Pin and maintain presentation dependencies.
 - Continue documentation and operational runbooks.
@@ -43,7 +43,7 @@ Version 1 establishes the current day-trading platform:
 
 - Yahoo outages, throttling, and history restrictions
 - Futures session and rollover differences
-- Hard-coded assumptions about NQ point tolerances
+- Unvalidated reuse of current point tolerances for future instruments beyond NQ/ES
 - UI-library and chart-library compatibility
 - Diagnostic terminology drifting away from authority terminology
 
@@ -233,7 +233,7 @@ Volume profile depends on trustworthy volume and session normalization. Executio
 | Concern | Day-trading platform | Future swing-options engine |
 |---|---|---|
 | Primary horizon | Intraday | Multi-session swing |
-| Current instruments | NQ, future ES selection | Not approved |
+| Current instruments | NQ and ES | Not approved |
 | Data | Futures OHLCV; future profile/order flow | Underlying plus options chain |
 | Roles | 4H/1H context, 15M setup, 5M confirmation, 1M trigger | To be independently defined |
 | Playbooks | ICT Liquidity Sweep Reversal | No approved playbook yet |

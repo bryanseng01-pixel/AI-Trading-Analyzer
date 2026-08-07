@@ -88,6 +88,7 @@ class DealingRangeResult:
     validity: DealingRangeValidity
     evaluated_through: pd.Timestamp | None
     limitations: tuple[str, ...]
+    instrument_key: str = "NQ"
 
     def __post_init__(self) -> None:
         if _normalize_timeframe(self.timeframe) != "15m":
@@ -127,6 +128,7 @@ def construct_dealing_range(
     direction: Direction,
     timeframe: str,
     evaluated_through: pd.Timestamp | None = None,
+    instrument_key: str = "NQ",
 ) -> DealingRangeResult:
     """Build one latest completed directional 15M swing-leg range."""
 
@@ -142,6 +144,7 @@ def construct_dealing_range(
             DealingRangeValidity.INSUFFICIENT_SWINGS,
             evaluated,
             "Both confirmed 15M swing highs and lows are required.",
+            instrument_key,
         )
 
     if direction == Direction.BULLISH:
@@ -155,6 +158,7 @@ def construct_dealing_range(
             DealingRangeValidity.NO_COMPLETED_DIRECTIONAL_LEG,
             evaluated,
             "No completed directional 15M swing leg is available.",
+            instrument_key,
         )
 
     low_time, low, high_time, high = candidate
@@ -165,6 +169,7 @@ def construct_dealing_range(
             DealingRangeValidity.INVALID_BOUNDS,
             evaluated,
             "The selected swing leg does not have valid price bounds.",
+            instrument_key,
         )
 
     if direction == Direction.BULLISH:
@@ -186,6 +191,7 @@ def construct_dealing_range(
             DealingRangeValidity.INVALIDATED_BY_LATER_SWING,
             evaluated,
             "The latest completed range was invalidated by a later confirmed swing.",
+            instrument_key,
         )
 
     dealing_range = DealingRange(
@@ -213,6 +219,7 @@ def construct_dealing_range(
         validity=DealingRangeValidity.VALID,
         evaluated_through=evaluated,
         limitations=dealing_range.limitations,
+        instrument_key=instrument_key,
     )
 
 
@@ -334,6 +341,7 @@ def _invalid_result(
     validity: DealingRangeValidity,
     evaluated_through: pd.Timestamp | None,
     limitation: str,
+    instrument_key: str,
 ) -> DealingRangeResult:
     return DealingRangeResult(
         timeframe=timeframe,
@@ -342,6 +350,7 @@ def _invalid_result(
         validity=validity,
         evaluated_through=evaluated_through,
         limitations=(limitation,),
+        instrument_key=instrument_key,
     )
 
 

@@ -22,6 +22,7 @@ from premium_discount_engine import (
     evaluate_premium_discount,
 )
 from timeframe_roles import Direction
+from instruments import INSTRUMENT_REGISTRY, build_location_id
 from volume_profile_engine import (
     ExecutionZoneProfileAssessment,
     ProfileRelationship,
@@ -94,6 +95,8 @@ class OverlayZone:
     kind: OverlayZoneKind = OverlayZoneKind.ORIGINAL_FVG
     purpose: OverlayZonePurpose = OverlayZonePurpose.AUTHORITY_REQUIRED
     inversion_time: pd.Timestamp | None = None
+    instrument_key: str = "NQ"
+    location_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -340,6 +343,7 @@ class SetupOverlay:
     annotations: tuple[OverlayAnnotation, ...]
     visibility: OverlayVisibility
     limitations: tuple[str, ...]
+    instrument_key: str = "NQ"
 
 
 # A future OverlayEvent timeline can record ordered setup transitions without
@@ -355,9 +359,25 @@ def build_setup_overlay(
     minimum_ifvg_size: float | None = None,
     order_block_result: OrderBlockResult | None = None,
     dealing_range_result: DealingRangeResult | None = None,
+    instrument_key: str = "NQ",
 ) -> SetupOverlay:
     """Project authoritative setup state into a chart-ready snapshot."""
 
+    instrument = INSTRUMENT_REGISTRY.resolve(instrument_key)
+    analysis_keys = {analysis.instrument_key for analysis in timeframe_analyses.values()}
+    if analysis_keys != {instrument.key}:
+        raise ValueError("All timeframe analyses must match the selected instrument.")
+    supplied_results = tuple(
+        result
+        for result in (
+            fvg_lifecycle_result,
+            order_block_result,
+            dealing_range_result,
+        )
+        if result is not None
+    )
+    if any(result.instrument_key != instrument.key for result in supplied_results):
+        raise ValueError("Location analysis does not match the selected instrument.")
     status = authority_decision.recommendation
     direction = authority_decision.roles.context_direction
     phase = authority_decision.playbook["phase"]
@@ -379,6 +399,7 @@ def build_setup_overlay(
             total_steps=total_steps,
             completion_percentage=completion_percentage,
             limitations=limitations,
+            instrument_key=instrument.key,
         )
 
     setup_level = None
@@ -452,7 +473,7 @@ def build_setup_overlay(
                 "current structure and labels."
             )
 
-    execution_zone = _execution_zone(authority_decision, direction)
+    execution_zone = _execution_zone(authority_decision, direction, instrument.key)
     if phase == "waiting_for_execution_zone" and execution_zone is None:
         limitations.append(
             "A future 1M FVG location cannot be calculated before it forms."
@@ -551,6 +572,7 @@ def build_setup_overlay(
         annotations=annotations,
         visibility=visibility,
         limitations=tuple(limitations),
+        instrument_key=instrument.key,
     )
 
 
@@ -561,6 +583,7 @@ def _avoid_overlay(
     total_steps: int,
     completion_percentage: float,
     limitations: list[str],
+    instrument_key: str,
 ) -> SetupOverlay:
     visibility = OverlayVisibility(
         show_context_explanation=True,
@@ -611,6 +634,7 @@ def _avoid_overlay(
         annotations=(annotation,),
         visibility=visibility,
         limitations=tuple(limitations),
+        instrument_key=instrument_key,
     )
 
 
@@ -765,6 +789,7 @@ def _select_liquidity_level(
 def _execution_zone(
     decision: AuthorityDecision,
     direction: Direction | None,
+    instrument_key: str,
 ) -> OverlayZone | None:
     if direction is None:
         return None
@@ -779,18 +804,32 @@ def _execution_zone(
     required = {"top", "bottom", "start_time", "end_time"}
     if not required.issubset(fvg):
         return None
+    instrument = INSTRUMENT_REGISTRY.resolve(instrument_key)
+    start_time = pd.Timestamp(fvg["start_time"])
+    bottom = float(fvg["bottom"])
+    top = float(fvg["top"])
     return OverlayZone(
-        top=float(fvg["top"]),
-        bottom=float(fvg["bottom"]),
+        top=top,
+        bottom=bottom,
         timeframe="1M",
         direction=direction,
         label=f"Active {direction.value} 1M FVG",
-        start_time=pd.Timestamp(fvg["start_time"]),
+        start_time=start_time,
         formation_end_time=pd.Timestamp(fvg["end_time"]),
         source="authority_filtered_fvg",
         importance="primary",
         kind=OverlayZoneKind.ORIGINAL_FVG,
         purpose=OverlayZonePurpose.AUTHORITY_REQUIRED,
+        instrument_key=instrument.key,
+        location_id=build_location_id(
+            instrument,
+            source_identity="YAHOO_CONTINUOUS",
+            timeframe="1M",
+            zone_kind="original_fvg",
+            formation_time=start_time,
+            bottom=bottom,
+            top=top,
+        ),
     )
 
 
@@ -1083,6 +1122,16 @@ def _build_ifvg_support(
         kind=OverlayZoneKind.IFVG,
         purpose=OverlayZonePurpose.OPTIONAL_CONFLUENCE,
         inversion_time=inversion_time,
+        instrument_key=execution_zone.instrument_key,
+        location_id=build_location_id(
+            INSTRUMENT_REGISTRY.resolve(execution_zone.instrument_key),
+            source_identity="YAHOO_CONTINUOUS",
+            timeframe="1M",
+            zone_kind="ifvg",
+            formation_time=inversion_time,
+            bottom=zone.bottom,
+            top=zone.top,
+        ),
     )
     return IfvgOverlaySupport(
         applicable=True,
@@ -1208,6 +1257,16 @@ def _build_order_block_support(
         importance="secondary",
         kind=OverlayZoneKind.ORDER_BLOCK,
         purpose=OverlayZonePurpose.OPTIONAL_CONFLUENCE,
+        instrument_key=execution_zone.instrument_key,
+        location_id=build_location_id(
+            INSTRUMENT_REGISTRY.resolve(execution_zone.instrument_key),
+            source_identity="YAHOO_CONTINUOUS",
+            timeframe="1M",
+            zone_kind="order_block",
+            formation_time=selected.formation_time,
+            bottom=selected.bottom,
+            top=selected.top,
+        ),
     )
     return OrderBlockOverlaySupport(
         applicable=True,

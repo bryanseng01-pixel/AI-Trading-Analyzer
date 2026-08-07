@@ -18,4 +18,5 @@ def build_delta_confluence_factor(
         importance="secondary",
         source="DeltaEngine",
         explanation=assessment.explanation,
+        instrument_key=assessment.metadata.provenance.instrument.root_symbol,
     )

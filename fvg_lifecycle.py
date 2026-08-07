@@ -119,6 +119,7 @@ class FvgLifecycleResult:
     active_fvgs: tuple[FvgLifecycle, ...]
     active_ifvgs: tuple[FvgLifecycle, ...]
     limitations: tuple[str, ...]
+    instrument_key: str = "NQ"
 
 
 def evaluate_fvg_lifecycles(
@@ -126,6 +127,7 @@ def evaluate_fvg_lifecycles(
     formed_fvgs: Iterable[DetectedFvg | Mapping[str, Any]],
     *,
     timeframe: str,
+    instrument_key: str = "NQ",
 ) -> FvgLifecycleResult:
     """Evaluate wick interaction and close-confirmed inversion only."""
 
@@ -153,6 +155,7 @@ def evaluate_fvg_lifecycles(
             if zone.active and zone.kind == ImbalanceKind.IFVG
         ),
         limitations=(),
+        instrument_key=instrument_key,
     )
 
 

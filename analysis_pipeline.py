@@ -37,6 +37,7 @@ class TimeframeAnalysis:
     fvgs: list[dict[str, Any]]
     equal_highs: list[dict[str, Any]]
     equal_lows: list[dict[str, Any]]
+    instrument_key: str = "NQ"
 
 
 def analyze_timeframe(
@@ -46,6 +47,7 @@ def analyze_timeframe(
     ema_period: int = 50,
     swing_lookback: int = 3,
     liquidity_tolerance: float = 5.0,
+    instrument_key: str = "NQ",
 ) -> TimeframeAnalysis:
     """Run the existing technical rules once for a single timeframe."""
 
@@ -89,6 +91,7 @@ def analyze_timeframe(
             lows,
             tolerance=liquidity_tolerance,
         ),
+        instrument_key=instrument_key,
     )
 
 

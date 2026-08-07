@@ -131,6 +131,7 @@ class OrderBlockResult:
     order_blocks: tuple[OrderBlock, ...]
     active_order_blocks: tuple[OrderBlock, ...]
     limitations: tuple[str, ...]
+    instrument_key: str = "NQ"
 
 
 def evaluate_order_blocks(
@@ -139,6 +140,7 @@ def evaluate_order_blocks(
     *,
     timeframe: str,
     rules: OrderBlockRules = OrderBlockRules(),
+    instrument_key: str = "NQ",
 ) -> OrderBlockResult:
     """Form and evaluate structural Order Blocks without issuing decisions."""
 
@@ -204,6 +206,7 @@ def evaluate_order_blocks(
         order_blocks=order_blocks,
         active_order_blocks=tuple(block for block in order_blocks if block.active),
         limitations=tuple(limitations),
+        instrument_key=instrument_key,
     )
 
 

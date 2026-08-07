@@ -2,8 +2,11 @@ import yfinance as yf
 import pandas as pd
 import streamlit as st
 
+from instruments import INSTRUMENT_REGISTRY
+
 @st.cache_data(ttl=15)
-def get_market_data(symbol, timeframe):
+def get_market_data(instrument_key, timeframe):
+    symbol = INSTRUMENT_REGISTRY.resolve_yahoo_symbol(instrument_key)
 
     # 4-hour candles are created from 1-hour data
     if timeframe == "4h":
