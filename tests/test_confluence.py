@@ -54,7 +54,7 @@ def test_implemented_factors_mirror_authority_gates(ohlc_factory):
 def test_future_placeholders_are_unevaluated_and_excluded(ohlc_factory):
     _, _, result = _result(ohlc_factory)
 
-    assert len(result.pending_future_factors) == 10
+    assert len(result.pending_future_factors) == 11
     assert result.total_supported == 6
     assert all(not factor.implemented for factor in result.pending_future_factors)
     assert all(factor.satisfied is None for factor in result.pending_future_factors)

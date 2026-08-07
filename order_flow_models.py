@@ -309,7 +309,7 @@ class OrderFlowAnalysisMetadata:
     engine_name: str
     engine_version: str
     provenance: OrderFlowProvenance
-    location: AuthorityExecutionLocation
+    location: AuthorityExecutionLocation | None
     evaluated_start_time: pd.Timestamp
     evaluated_end_time: pd.Timestamp
     availability: AnalyticalAvailability

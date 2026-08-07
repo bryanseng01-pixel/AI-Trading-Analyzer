@@ -76,6 +76,7 @@ _FUTURE_FACTORS = (
     ("premium_discount", "Premium/Discount"),
     ("volume_profile", "Volume Profile"),
     ("delta_confirmation", "Delta Confirmation"),
+    ("cumulative_delta_context", "Cumulative Delta Context"),
     ("footprint", "Footprint"),
     ("bid_ask_imbalance", "Bid/Ask Imbalance"),
     ("absorption", "Absorption"),

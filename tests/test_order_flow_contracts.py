@@ -71,12 +71,15 @@ def test_domain_result_contracts_are_independent_and_immutable():
     )
     delta = DeltaResult(metadata, (bucket,), 12, 7, 2, 5, 19 / 21)
     cumulative = CumulativeDeltaResult(
-        metadata,
-        metadata.evaluated_start_time,
-        "explicit_test_anchor",
-        0,
-        5,
-        (),
+        metadata=metadata,
+        anchor=None,
+        anchor_time=metadata.evaluated_start_time,
+        anchor_reason="legacy contract fixture",
+        starting_value=0,
+        ending_value=5,
+        points=(),
+        reset_events=(),
+        valid_through=metadata.evaluated_end_time,
     )
     imbalance = BidAskImbalanceResult(
         metadata, 12, 7, 2, 12 / 7, None, None, "Rules are not approved."

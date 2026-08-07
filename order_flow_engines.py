@@ -11,6 +11,11 @@ from order_flow_models import (
 )
 
 if TYPE_CHECKING:
+    from cumulative_delta_engine import (
+        CumulativeDeltaAnchor,
+        CumulativeDeltaResetEvent,
+    )
+    from delta_aggregation import DeltaBucketSeries
     from delta_engine import DeltaLocationAssessment
 
 
@@ -46,11 +51,14 @@ class CumulativeDeltaPoint:
 @dataclass(frozen=True)
 class CumulativeDeltaResult:
     metadata: OrderFlowAnalysisMetadata
+    anchor: "CumulativeDeltaAnchor"
     anchor_time: pd.Timestamp
     anchor_reason: str
     starting_value: float
     ending_value: float
     points: tuple[CumulativeDeltaPoint, ...]
+    reset_events: tuple["CumulativeDeltaResetEvent", ...]
+    valid_through: pd.Timestamp | None
 
 
 @dataclass(frozen=True)
@@ -144,8 +152,10 @@ class DeltaEngine(Protocol):
 class CumulativeDeltaEngine(Protocol):
     def evaluate(
         self,
-        window: OrderFlowWindow,
-        location_window: ExecutionLocationWindow,
+        bucket_series: "DeltaBucketSeries",
+        anchor: "CumulativeDeltaAnchor",
+        *,
+        evaluated_through: pd.Timestamp,
     ) -> CumulativeDeltaResult: ...
 
 
