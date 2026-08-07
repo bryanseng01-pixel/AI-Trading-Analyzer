@@ -596,6 +596,58 @@ def display_tradingview_chart(
                         }}
                     ]);
                 }}
+
+                if (setupOverlayData.volume_profile !== null) {{
+                    const profile = setupOverlayData.volume_profile;
+                    [
+                        [profile.poc, "Prev NY POC", LightweightCharts.LineStyle.Solid],
+                        [profile.vah, "Prev NY VAH", LightweightCharts.LineStyle.Dashed],
+                        [profile.val, "Prev NY VAL", LightweightCharts.LineStyle.Dashed]
+                    ].forEach(([price, title, lineStyle]) => {{
+                        candleSeries.createPriceLine({{
+                            price: price,
+                            color: "#38bdf8",
+                            lineWidth: title === "Prev NY POC" ? 2 : 1,
+                            lineStyle: lineStyle,
+                            axisLabelVisible: true,
+                            title: title
+                        }});
+                    }});
+
+                    const profileRangeSeries = chart.addSeries(
+                        LightweightCharts.BaselineSeries,
+                        {{
+                            baseValue: {{ type: "price", price: profile.price_low }},
+                            topFillColor1: "rgba(56, 189, 248, 0.025)",
+                            topFillColor2: "rgba(56, 189, 248, 0.025)",
+                            bottomFillColor1: "rgba(56, 189, 248, 0.0)",
+                            bottomFillColor2: "rgba(56, 189, 248, 0.0)",
+                            topLineColor: "rgba(56, 189, 248, 0.18)",
+                            bottomLineColor: "rgba(56, 189, 248, 0.0)",
+                            lineWidth: 1,
+                            priceLineVisible: false,
+                            lastValueVisible: false
+                        }}
+                    );
+                    profileRangeSeries.setData([
+                        {{ time: profile.start_time, value: profile.price_high }},
+                        {{ time: profile.end_time, value: profile.price_high }}
+                    ]);
+
+                    profile.nodes.forEach((node) => {{
+                        const color = node.kind === "hvn" ? "#0ea5e9" : "#94a3b8";
+                        [node.bottom, node.top].forEach((price) => {{
+                            candleSeries.createPriceLine({{
+                                price: price,
+                                color: color,
+                                lineWidth: 1,
+                                lineStyle: LightweightCharts.LineStyle.Dotted,
+                                axisLabelVisible: false,
+                                title: node.kind.toUpperCase()
+                            }});
+                        }});
+                    }});
+                }}
             }}
 
             chart.timeScale().fitContent();
@@ -753,6 +805,43 @@ def _serialize_setup_overlay(
             "importance": range_overlay.importance,
         }
 
+    volume_profile = None
+    profile_support = overlay.volume_profile_support
+    profile_range = profile_support.profile_range
+    if visibility.show_volume_profile and profile_range is not None:
+        nodes = []
+        for node in (
+            profile_support.selected_hvn,
+            profile_support.selected_lvn,
+        ):
+            if node is None:
+                continue
+            nodes.append(
+                {
+                    "kind": node.kind.value,
+                    "bottom": node.bottom,
+                    "top": node.top,
+                    "peak_price": node.peak_price,
+                    "importance": node.importance,
+                }
+            )
+        volume_profile = {
+            "start_time": int(profile_range.start_time.timestamp()),
+            "end_time": int(profile_range.end_time.timestamp()),
+            "price_low": profile_range.price_low,
+            "price_high": profile_range.price_high,
+            "poc": profile_range.poc,
+            "vah": profile_range.vah,
+            "val": profile_range.val,
+            "source": profile_range.source,
+            "data_quality": profile_range.data_quality,
+            "importance": profile_range.importance,
+            "nodes": nodes,
+            "relationships": [
+                item.value for item in profile_support.relationships
+            ],
+        }
+
     return {
         "active_playbook": overlay.active_playbook,
         "authority_status": overlay.authority_status,
@@ -767,6 +856,7 @@ def _serialize_setup_overlay(
         "optional_ifvg_zone": optional_ifvg_zone,
         "optional_order_block_zone": optional_order_block_zone,
         "dealing_range": dealing_range,
+        "volume_profile": volume_profile,
         "annotations": [annotation.text for annotation in overlay.annotations],
         "limitations": list(overlay.limitations),
     }

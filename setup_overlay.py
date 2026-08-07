@@ -22,6 +22,11 @@ from premium_discount_engine import (
     evaluate_premium_discount,
 )
 from timeframe_roles import Direction
+from volume_profile_engine import (
+    ExecutionZoneProfileAssessment,
+    ProfileRelationship,
+    VolumeNodeKind,
+)
 
 
 class OverlayLevelRole(str, Enum):
@@ -231,6 +236,63 @@ class PremiumDiscountOverlaySupport:
 
 
 @dataclass(frozen=True)
+class OverlayProfileRange:
+    start_time: pd.Timestamp
+    end_time: pd.Timestamp
+    price_low: float
+    price_high: float
+    poc: float
+    vah: float
+    val: float
+    source: str
+    data_quality: str
+    importance: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.price_high <= self.price_low:
+            raise ValueError("Overlay profile high must exceed low.")
+        if not self.price_low <= self.val <= self.poc <= self.vah <= self.price_high:
+            raise ValueError("Overlay profile value-area levels are inconsistent.")
+
+
+@dataclass(frozen=True)
+class OverlayProfileNode:
+    kind: VolumeNodeKind
+    bottom: float
+    top: float
+    peak_price: float
+    importance: str | None = None
+
+
+@dataclass(frozen=True)
+class VolumeProfileOverlaySupport:
+    applicable: bool
+    evaluated: bool
+    profile_range: OverlayProfileRange | None
+    selected_hvn: OverlayProfileNode | None
+    selected_lvn: OverlayProfileNode | None
+    assessment: ExecutionZoneProfileAssessment | None
+    relationships: tuple[ProfileRelationship, ...]
+    explanation: str
+    limitations: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if self.evaluated:
+            if not self.applicable or self.profile_range is None or self.assessment is None:
+                raise ValueError("Evaluated Volume Profile support requires completed data.")
+        elif any(
+            value is not None
+            for value in (
+                self.profile_range,
+                self.selected_hvn,
+                self.selected_lvn,
+                self.assessment,
+            )
+        ):
+            raise ValueError("Unevaluated Volume Profile support cannot expose profile data.")
+
+
+@dataclass(frozen=True)
 class OverlayAnnotation:
     kind: OverlayAnnotationKind
     text: str
@@ -249,6 +311,7 @@ class OverlayVisibility:
     show_optional_ifvg_zone: bool
     show_optional_order_block_zone: bool
     show_dealing_range: bool
+    show_volume_profile: bool
     show_invalidation_level: bool
     show_target_levels: bool
 
@@ -271,6 +334,7 @@ class SetupOverlay:
     ifvg_support: IfvgOverlaySupport
     order_block_support: OrderBlockOverlaySupport
     premium_discount_support: PremiumDiscountOverlaySupport
+    volume_profile_support: VolumeProfileOverlaySupport
     invalidation_level: OverlayLevel | None
     target_levels: tuple[OverlayLevel, ...]
     annotations: tuple[OverlayAnnotation, ...]
@@ -479,6 +543,9 @@ def build_setup_overlay(
         ifvg_support=ifvg_support,
         order_block_support=order_block_support,
         premium_discount_support=premium_discount_support,
+        volume_profile_support=inactive_volume_profile_support(
+            "Volume Profile integration was not supplied."
+        ),
         invalidation_level=None,
         target_levels=(),
         annotations=annotations,
@@ -505,6 +572,7 @@ def _avoid_overlay(
         show_optional_ifvg_zone=False,
         show_optional_order_block_zone=False,
         show_dealing_range=False,
+        show_volume_profile=False,
         show_invalidation_level=False,
         show_target_levels=False,
     )
@@ -534,6 +602,9 @@ def _avoid_overlay(
         ),
         premium_discount_support=_inactive_premium_discount_support(
             "Premium/Discount is not applicable while authority status is AVOID."
+        ),
+        volume_profile_support=inactive_volume_profile_support(
+            "Volume Profile is not applicable while authority status is AVOID."
         ),
         invalidation_level=None,
         target_levels=(),
@@ -759,6 +830,7 @@ def _visibility(
         show_optional_ifvg_zone=False,
         show_optional_order_block_zone=False,
         show_dealing_range=False,
+        show_volume_profile=False,
         show_invalidation_level=False,
         show_target_levels=False,
     )
@@ -1248,4 +1320,25 @@ def _inactive_premium_discount_support(
         directionally_aligned=None,
         explanation=explanation,
         limitations=(),
+    )
+
+
+def inactive_volume_profile_support(
+    explanation: str,
+    *,
+    applicable: bool = False,
+    limitations: tuple[str, ...] = (),
+) -> VolumeProfileOverlaySupport:
+    """Return an unevaluated Volume Profile projection."""
+
+    return VolumeProfileOverlaySupport(
+        applicable=applicable,
+        evaluated=False,
+        profile_range=None,
+        selected_hvn=None,
+        selected_lvn=None,
+        assessment=None,
+        relationships=(),
+        explanation=explanation,
+        limitations=limitations,
     )

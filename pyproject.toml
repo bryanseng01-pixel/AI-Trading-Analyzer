@@ -52,4 +52,5 @@ py-modules = [
     "trade_checklist",
     "tradingview_chart",
     "volume_profile_engine",
+    "volume_profile_integration",
 ]

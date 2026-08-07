@@ -21,6 +21,11 @@ from premium_discount_integration import (
 from sessions import detect_session_levels
 from setup_overlay import build_setup_overlay
 from tradingview_chart import display_tradingview_chart
+from volume_profile_engine import build_previous_new_york_profile
+from volume_profile_integration import (
+    attach_volume_profile_support,
+    build_volume_profile_confluence_factor,
+)
 
 
 st.set_page_config(
@@ -134,10 +139,24 @@ setup_overlay = build_setup_overlay(
     order_block_result=order_block_result,
     dealing_range_result=dealing_range_result,
 )
+volume_profile_result = None
+if not execution_analysis.data.empty:
+    volume_profile_result = build_previous_new_york_profile(
+        execution_analysis.data,
+        evaluated_through=execution_analysis.data.index[-1],
+        tick_size=0.25,
+    )
+setup_overlay = attach_volume_profile_support(
+    setup_overlay,
+    volume_profile_result,
+)
 ifvg_confluence_factor = build_ifvg_confluence_factor(setup_overlay)
 order_block_confluence_factor = build_order_block_confluence_factor(setup_overlay)
 premium_discount_confluence_factor = (
     build_premium_discount_confluence_factor(setup_overlay)
+)
+volume_profile_confluence_factor = build_volume_profile_confluence_factor(
+    setup_overlay
 )
 confluence_result = evaluate_confluence(
     authority_decision,
@@ -146,6 +165,7 @@ confluence_result = evaluate_confluence(
         ifvg_confluence_factor,
         order_block_confluence_factor,
         premium_discount_confluence_factor,
+        volume_profile_confluence_factor,
     ),
 )
 trade_plan = authority_decision.trade_plan
