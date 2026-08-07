@@ -195,7 +195,15 @@ rejection rules, composite profiles, and authority gating remain undefined.
 
 Future approved rules may use bid/ask delta, footprint imbalance, absorption, or exhaustion after a suitable provider is integrated. Yahoo Finance cannot provide true bid/ask order flow, and candle direction or ordinary volume must not be presented as a substitute.
 
-Future evidence must be integrated through `DecisionAuthority`, not through an independent recommendation.
+The deterministic Delta engine can currently evaluate normalized synthetic or
+replayed trade events around the existing authority FVG. Its optional
+`delta_confirmation` assessment is not connected to the production dashboard
+because no licensed provider is configured. It remains non-required and cannot
+change this playbook's status, phase, gates, direction, or recommendation.
+
+Future evidence may enter `DecisionAuthority` only after a separately approved
+playbook change. Until then it remains optional, non-authoritative location
+evidence and cannot publish an independent recommendation.
 
 ## Future playbook placeholders
 

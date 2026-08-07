@@ -121,6 +121,12 @@ and optional-confluence contracts are implemented. No vendor, credentials,
 licensed data, aggregation interval, imbalance threshold, cumulative-delta
 anchor, absorption rule, or exhaustion rule has been selected or approved.
 
+The first Delta analytical engine is implemented against normalized synthetic
+events with fixed one-second location buckets, 90% classification coverage,
+fail-closed quality rules, and optional `delta_confirmation` adaptation. It is
+not connected to Yahoo, a live feed, SetupOverlay, or the dashboard. Provider
+selection and production-data validation remain prerequisites for runtime use.
+
 ### Dependencies
 
 - Vendor selection and commercial agreement

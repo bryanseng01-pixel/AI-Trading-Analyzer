@@ -102,6 +102,8 @@ The main page shows authority outputs, the selected chart, authority-gate progre
 | `volume_profile_integration.py` | Projects completed profile context into SetupOverlay and one optional, non-required confluence factor | Active non-authoritative adapter |
 | `ai_market_coach.py` | Earlier scoring, narrative, and game-plan functions | Legacy, non-authoritative |
 | `decision_engine.py` | Earlier weighted trade-plan builder | Legacy, non-authoritative |
+| `delta_engine.py` | Builds stable authority-FVG observation windows, calculates deterministic location-only Delta, and produces conservative directional assessments | Active analytical engine; synthetic normalized trades only |
+| `delta_integration.py` | Adapts a completed Delta location assessment into the optional `delta_confirmation` factor | Active non-authoritative adapter |
 | `trade_checklist.py` | Earlier readiness checklist and recommendation | Legacy, non-authoritative |
 | `ict_playbook.py` | Earlier standalone ICT playbook evaluator | Legacy, non-authoritative |
 
@@ -244,10 +246,24 @@ into a synthetic footprint.
 
 Typed result contracts and independent engine protocols exist for Delta,
 Cumulative Delta, Bid/Ask Imbalance, Footprint, Absorption, and Exhaustion.
-Their calculations, thresholds, anchors, event windows, and detection rules
-remain unimplemented and require separate approval. The generic integration
-adapter can consume only a completed assessment supplied by a future approved
-engine; it adds no analytical rules and always produces a non-required factor.
+The first deterministic Delta engine is implemented for normalized synthetic
+or replayed `TradeEvent` data. It begins at the first in-zone trade after an
+authority-visible WATCH/READY snapshot, includes only trades inside the same
+stable authority FVG, and calculates ask volume minus bid volume in one-second
+buckets anchored to first touch. UNKNOWN volume remains visible and is never
+redistributed.
+
+Delta directional interpretation requires aligned raw Delta and at least one
+tick of aligned in-zone price progress. Disagreement is mixed/divergent and
+does not claim absorption, exhaustion, trapped traders, or formal divergence.
+Poor classification coverage, sequence gaps, delayed live data, entitlement
+failure, contract mismatch, conflicting duplicates, and unresolved corrections
+fail closed for directional confluence. The optional `delta_confirmation`
+factor consumes only the completed assessment and cannot modify authority.
+
+Cumulative Delta, Bid/Ask Imbalance, Footprint, Absorption, and Exhaustion
+calculations remain unimplemented and require separate approval. No licensed
+provider, live connection, application integration, or Delta UI exists.
 
 ### Trade planner
 
@@ -272,7 +288,8 @@ The future swing-options engine must be a separate strategy system with separate
 - The production symbol is currently hard-coded to `NQ=F`; ES selection is planned.
 - Yahoo availability, history limits, and candle construction can affect results.
 - No live or historical licensed order-flow provider is configured.
-- Order-flow contracts exist, but analytical engine rules remain unimplemented.
+- Delta calculation and assessment rules exist for normalized synthetic data; no licensed feed is configured.
+- Other order-flow analytical engine rules remain unimplemented.
 - IFVG lifecycle, optional overlay, chart, and confluence integration exist; IFVG authority behavior is intentionally not implemented.
 - Order Block location evidence is optional and has no authority role.
 - Volume Profile approximation and optional location integration are implemented; a true tick-level profile is not.
