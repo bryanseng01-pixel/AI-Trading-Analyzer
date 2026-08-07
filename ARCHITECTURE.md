@@ -51,6 +51,10 @@ When BOS and CHoCH both exist, the latest event by timestamp controls. EMA direc
 - playbook phase and next event; and
 - the active 1M execution FVG set.
 
+The decision also exposes one immutable six-gate snapshot. Existing authority
+views, setup-overlay progress, and confluence evaluation consume that snapshot;
+they do not recalculate the strategy gates.
+
 No other current dashboard component is permitted to publish an independent recommendation.
 
 ### 5. Authority market story
@@ -78,6 +82,8 @@ The main page shows authority outputs, the selected chart, authority-gate progre
 | `sessions.py` | New York session windows, session highs/lows, and wick-based sweep detection | Active |
 | `timeframe_roles.py` | Typed direction/setup states and explicit timeframe-role mapping | Active strategy boundary |
 | `decision_authority.py` | Sole status, confidence, gate, next-action, and playbook-phase authority | Authoritative |
+| `setup_overlay.py` | Pure projection of authority state into chart-relevant levels, zones, visibility, and authority-gate progress | Active, non-decision projection |
+| `confluence.py` | Pure description of satisfied implemented evidence at an authority-approved location; future factors remain non-counting placeholders | Active analysis, non-authoritative |
 | `authority_market_story.py` | Visible narrative derived from authority role states | Authoritative narrative |
 | `dashboard.py` | Primary authority summary and authority-only gate progress | Active presentation |
 | `tradingview_chart.py` | Converts analysis results to Lightweight Charts candles and annotations | Active presentation |
@@ -120,6 +126,20 @@ The test suite uses deterministic synthetic OHLC fixtures and covers:
 ## Future component boundaries
 
 The following are planned boundaries, not implemented behavior.
+
+### Confluence contributors
+
+Approved location engines may contribute immutable `ConfluenceFactor` results.
+The Confluence Engine accepts those results without knowing how they were
+calculated. It does not determine direction, status, confidence, phase, or a
+recommendation, and it performs no chart or raw-market analysis. IFVG, order
+blocks, premium/discount, volume profile, delta, footprint, bid/ask imbalance,
+absorption, SMT, and OTE are placeholders only and are excluded from current
+implemented-evidence calculations.
+
+`ConfluenceResult.location_notes` is reserved for future descriptive
+observations from approved location engines. It remains empty until such an
+engine and its rules are approved.
 
 ### Volume profile
 
